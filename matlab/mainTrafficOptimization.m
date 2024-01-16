@@ -5,8 +5,8 @@ function mainTrafficOptimization()
     maxDensity = 50;
     maxEnv = 10;
     maxRoad = 5;
-    numSegments = 100; % Number of road segments
-    numLanes = 3; % Assuming 3 lanes
+    numSegments = 5; % Number of road segments % FIXME: make it global
+    numLanes = 2; % Number of lanes per each segment % FIXME: make it global
 
     % Traffic density (vehicles per km per lane)
     densityRange = [20, 100]; % Minimum and maximum density
@@ -37,9 +37,8 @@ function mainTrafficOptimization()
         end
     end
 
-    % Run the script continuously or for a specific number of iterations
+    %% The main loop code
     while true
-        % Your main loop code
         [rho, env_conditions, road_conditions] = generateTrafficData(maxDensity, maxEnv, maxRoad, cycle);
         % Call the optimization routine with the new data
         v_lim_opt = runOptimization(rho);

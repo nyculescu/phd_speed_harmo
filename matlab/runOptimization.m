@@ -2,8 +2,10 @@
 % Purpose: To optimize the speed limits along a road segment based on traffic density and other constraints.
 % Inputs:
 %   rho - Array representing the traffic density at different segments of the road.
-
 function v_lim_opt = runOptimization(rho)
+    numLanes = 2; % Number of lanes per each segment % FIXME: make it global
+    numSegments = 5; % FIXME: make it global
+
     % This function calculates the optimal speed limit for each road segment based
     % on the current traffic density. It uses a nonlinear optimization routine
     % provided by MATLAB's fmincon function.
@@ -11,12 +13,12 @@ function v_lim_opt = runOptimization(rho)
     % Define target density and target speed
     % These values represent the desired traffic conditions and are used in 
     % the objective function to measure the deviation of actual conditions from these targets.
-    rho_target = 30; % Target vehicles per kilometer, an example value
-    v_target = 80; % Target speed in km/h, an example value
+    rho_target = 30 * ones(numSegments, numLanes); % Target vehicles per kilometer, an example value
+    v_target = 80 * ones(numSegments, numLanes); % Target speed in km/h, an example value
 
     % Weight for speed deviation cost in the objective function
     % This weight determines the relative importance of speed deviation in the cost calculation.
-    alpha = 1; % Adjustable based on desired emphasis on speed deviation
+    alpha = ones(numSegments, numLanes); % Adjustable based on desired emphasis on speed deviation
 
     % Spatial coordinates for the road segment
     % This divides a 10 km road segment into 100 parts for analysis.
@@ -35,29 +37,47 @@ function v_lim_opt = runOptimization(rho)
     
     % Initial guess for the speed limit
     % This provides a starting point for the optimization algorithm.
-    v_lim0 = 70 * ones(size(x)); % Initial guess: 70 km/h for all segments
+    v_lim0 = 70 * ones(numSegments, numLanes); % Initial guess: 70 km/h for all lanes and segments
     
     % Run the optimization using fmincon
     % The function finds the speed limit that minimizes the objective function
     % while satisfying the defined constraints.
-    [v_lim_opt, J_min] = fmincon(@(v_lim) objectiveFunction(v_lim, rho_target, v_target, alpha, x, t, rho), ...
+    [v_lim_opt, J_min] = fmincon(@(v_lim) sum(objectiveFunction(v_lim, rho_target, v_target, alpha, x, t, rho), 'all'), ...
         v_lim0, [], [], [], [], [], [], ...
         @(v_lim) constraints(v_lim, x, t, rho), ...
         options);
-    v_lim_opt = round(v_lim_opt); 
+    v_lim_opt = round(v_lim_opt);
+
     
     % Display the optimized speed limits
     disp('Optimal speed limit:');
     disp(v_lim_opt);
     
-    % Plot the optimized speed limits
-    % This provides a visual representation of how speed limits vary along the road segment.
-    figure;
-    plot(x, v_lim_opt, 'b-', 'LineWidth', 2);
-    xlabel('Position on Road (km)');
-    ylabel('Optimal Speed Limit (km/h)');
-    title('Optimal Speed Limit Distribution Along the Road Segment');
-    grid on;
+    % Determine the actual number of lanes and segments
+    [numSegments, numLanes] = size(v_lim_opt);
+    % Plot the optimized speed limits for each lane
+    % Create or refresh the figure
+    clf; % Clear the current figure
+
+    % Generate x based on the number of segments
+    x = linspace(0, 10, numSegments); % Assuming a 10 km road segment
+
+    for segment = 1:numSegments
+        for lane = 1:numLanes
+            subplot(numSegments, numLanes, (segment - 1) * numLanes + lane);
+            plot(x, ones(size(x)) * v_lim_opt(segment, lane), 'b-', 'LineWidth', 2);
+            xlabel('Position on Road [km]');
+            ylabel('Rec Spd [km/h]'); % Recommended Speed
+            ylim([v_lim_opt(segment, lane)-10, v_lim_opt(segment, lane)+10]); % Set the y-axis limits
+            grid on;
+
+            % Add a subtitle
+            title(['Segment ', num2str(segment), ', Lane ', num2str(lane)]);
+        end
+    end
+    % Set a common title for all subplots
+    sgtitle('Optimal Speed Limit Distribution for Multi-Lane Road');
+
 end
 
 
@@ -84,10 +104,14 @@ end
 %   rho_target, v_target - Target traffic density and speed
 %   alpha - Weight for speed deviation cost
 %   x, t - Spatial and temporal coordinates
-
 function J = objectiveFunction(v_lim, rho_target, v_target, alpha, x, t, rho)
-    % Calculate the cost function based on deviation from target density and speed.
-    J = sum(sum((rho - rho_target).^2 + alpha.*(v_lim - v_target).^2));
+    % Calculate the cost function based on deviation from target density and speed for each lane and segment.
+    J = zeros(size(v_lim, 1), size(v_lim, 2));
+    for i = 1:size(v_lim, 1)
+        for j = 1:size(v_lim, 2)
+            J(i,j) = sum(sum((rho(i,j) - rho_target(i,j)).^2 + alpha.*(v_lim(i,j) - v_target(i,j)).^2));
+        end
+    end
 end
 
 % Function: constraints
@@ -100,46 +124,53 @@ function [c, ceq] = constraints(v_lim, x, t, rho)
     % This function defines the constraints for the optimization problem.
     % It includes both inequality and equality constraints.
 
-    % Inequality constraints (c)
+    % Initialize constraints for each lane and segment
+    numLanes = size(v_lim, 1);
+    numSegments = size(v_lim, 2);
+
+    c = zeros(numLanes * numSegments * 4, 1); % Inequality constraints
+    ceq = zeros(numLanes * numSegments * 3, 1); % Equality constraints
 
     % Maximum and minimum speed limits
-    % These constraints ensure that the optimized speed limit stays within realistic and safe bounds.
     max_speed_limit = 120; % Upper bound for speed limit in km/h
     min_speed_limit = 30;  % Lower bound for speed limit in km/h
 
-    % c1 and c2 ensure that the speed limit does not exceed max_speed_limit and does not fall below min_speed_limit, respectively.
-    c1 = v_lim - max_speed_limit;
-    c2 = min_speed_limit - v_lim;
-
     % Traffic Density Constraints
-    % These constraints manage traffic density to prevent over-congestion or underutilization.
     max_density = 50; % Upper limit for traffic density (vehicles per km)
     min_density = 5;  % Lower limit for traffic density (vehicles per km)
 
-    % c3 and c4 ensure that the traffic density does not exceed max_density and does not fall below min_density, respectively.
-    c3 = rho - max_density;
-    c4 = min_density - rho;
+    idx = 1; % Index for constraints
+    for lane = 1:numLanes
+        for segment = 1:numSegments
+            % Inequality constraints (c)
 
-    % Combine all inequality constraints
-    c = [c1; c2; c3; c4];
+            % c1 and c2 ensure that the speed limit does not exceed max_speed_limit and does not fall below min_speed_limit, respectively.
+            c(idx) = v_lim(lane, segment) - max_speed_limit;
+            idx = idx + 1;
+            c(idx) = min_speed_limit - v_lim(lane, segment);
+            idx = idx + 1;
 
-    % Equality constraints (ceq)
-    % Currently, there are no specific equality constraints implemented.
-    % Placeholder for potential future use.
-    % Equality constraints
-    ceq1 = maintainMinimumAverageSpeed(v_lim, 60); % Example: Minimum average speed of 60 km/h
-    ceq2 = smoothSpeedTransitions(v_lim, 20);     % Example: Maximum speed difference of 20 km/h
-    ceq3 = equalizeTrafficDensity(rho, 25);       % Example: Target density of 25 vehicles per km
+            % c3 and c4 ensure that the traffic density does not exceed max_density and does not fall below min_density, respectively.
+            c(idx) = rho(lane, segment) - max_density;
+            idx = idx + 1;
+            c(idx) = min_density - rho(lane, segment);
+            idx = idx + 1;
 
-    ceq = [ceq1; ceq2; ceq3]; % Combine all equality constraints
+            % Equality constraints (ceq)
+            % You can implement equality constraints for each lane and segment as needed.
+            % Placeholder for potential future use.
+
+            % Increment the index for equality constraints
+            idx = idx + 1;
+        end
+    end
 
     % Diagnostic display of constraint values for debugging and analysis
-    disp('Constraint values:');
-    disp(['c1: ', num2str(c1)]);
-    disp(['c2: ', num2str(c2)]);
-    disp(['c3: ', num2str(c3)]);
-    disp(['c4: ', num2str(c4)]);
+    % disp('Constraint values:');
+    % disp(['c: ', num2str(c)]);
+    % disp(['ceq: ', num2str(ceq)]);
 end
+
 
 
 function visibility_factor = calculateVisibilityFactor()

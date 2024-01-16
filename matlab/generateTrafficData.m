@@ -1,34 +1,50 @@
+% The function uses 3D arrays to store data for each segment and lane. 
+% The first dimension is for the segments, 
+% the second for the lanes, 
+% and the third for the conditions (density, environment, road surface)
 function [rho, env_conditions, road_conditions] = generateTrafficData(maxDensity, maxEnv, maxRoad, cycle)
-    % Number of road segments
-    numSegments = 100;
+    numSegments = 5; % Number of road segments % FIXME: make it global
+    numLanes = 2; % Number of lanes per each segment % FIXME: make it global
 
     % Initialize arrays
-    rho = zeros(1, numSegments);
-    env_conditions = zeros(1, numSegments);
-    road_conditions = zeros(1, numSegments);
+    % Lane-Specific Conditions
+    % The traffic density (rho) is calculated for each lane. 
+    % TODO: introduce lane-specific variations or patterns as required.
+    rho = zeros(numSegments, numLanes);
+
+    % Shared Environmental and Road Conditions
+    % In this example, environmental and road conditions are assumed to be 
+    % the same across all lanes of a segment. 
+    % TODO: these can also be made lane-specific.
+    env_conditions = zeros(numSegments, numLanes);
+    road_conditions = zeros(numSegments, numLanes);
 
     % Define segments for specific scenarios like bottlenecks or incidents
-    bottleneckSegments = 40:50; % Example: segments 40 to 50 are a bottleneck area
-    incidentSegments = 70:80;   % Example: segments 70 to 80 have an incident
+    bottleneckSegments = 1:2; % Example: segments 1 to 2 are a bottleneck area
+    incidentSegments = 2:3;   % Example: segments 2 to 3 have an incident
+    eventSegments = 2:3;
+    congestionSegments = 4:5;
 
-    % Generate cyclic traffic density with specific conditions
+    %% Generate cyclic traffic density with specific conditions
+    % Simulate different scenarios for each lane
     for i = 1:numSegments
-        if ismember(i, bottleneckSegments) || ismember(i, incidentSegments)
-            % Higher density at bottlenecks and incident areas
-            rho(i) = maxDensity * 0.8 + sin(cycle) * (maxDensity * 0.2);
-        else
-            % Normal cyclic variation in other areas
-            rho(i) = maxDensity * 0.5 + sin(cycle) * (maxDensity * 0.5);
+        for j = 1:numLanes
+            % Traffic density variations
+            if ismember(i, bottleneckSegments) || ismember(i, incidentSegments) || ismember(i, congestionSegments)
+                rho(i, j) = maxDensity * 0.8 + sin(cycle + j) * (maxDensity * 0.2);
+            elseif ismember(i, eventSegments)
+                rho(i, j) = maxDensity * 0.7 + sin(cycle + j) * (maxDensity * 0.3);
+            else
+                rho(i, j) = maxDensity * 0.5 + sin(cycle + j) * (maxDensity * 0.5);
+            end
+
+            % Environmental conditions (assumed same across lanes)
+            env_conditions(i, j) = rand * maxEnv;
+
+            % Road conditions (assumed same across lanes)
+            road_conditions(i, j) = rand * maxRoad;
         end
     end
-
-    % Generate environmental and road conditions
-    % Here you can introduce more complexity based on your scenario
-    env_conditions = rand(1, numSegments) * maxEnv;
-    road_conditions = rand(1, numSegments) * maxRoad;
-
-    % Optionally, add specific conditions for environmental and road scenarios
-    % For example, lower visibility in bottleneck areas during certain cycles
 end
 
 %% Cyclic Traffic Density: The function now generates traffic density (rho) in a cyclic manner, with variations over time. 
