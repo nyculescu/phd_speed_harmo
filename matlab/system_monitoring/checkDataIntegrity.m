@@ -1,11 +1,11 @@
 % Data Integrity and Anomaly Detection Module
 % FIXME: At this moment, this is a mock function
 function [isDataValid, anomalyReport] = checkDataIntegrity(sensorData)
-    % Implement checks for data anomalies
-    % Example: check for sudden, unrealistic changes in data
-    isDataValid = true;
+    isDataValid = true;   
     anomalyReport = struct();
     
+    % Implement checks for data anomalies on sensorData variable
+    % FIXME: at this moment, only simulation is available
     % Simulate random anomalies for demonstration
     if rand < 0.1 % 10% chance of anomaly
         isDataValid = false;

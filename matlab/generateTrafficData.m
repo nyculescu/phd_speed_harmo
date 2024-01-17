@@ -2,10 +2,7 @@
 % The first dimension is for the segments, 
 % the second for the lanes, 
 % and the third for the conditions (density, environment, road surface)
-function [rho, env_conditions, road_conditions] = generateTrafficData(maxDensity, maxEnv, maxRoad, cycle)
-    numSegments = 5; % Number of road segments % FIXME: make it global
-    numLanes = 2; % Number of lanes per each segment % FIXME: make it global
-
+function [rho, env_conditions, road_conditions] = generateTrafficData(maxDensity, maxEnv, maxRoad, cycle, numSegments, numLanes)
     % Initialize arrays
     % Lane-Specific Conditions
     % The traffic density (rho) is calculated for each lane. 

@@ -2,10 +2,7 @@
 % Purpose: To optimize the speed limits along a road segment based on traffic density and other constraints.
 % Inputs:
 %   rho - Array representing the traffic density at different segments of the road.
-function v_lim_opt = runOptimization(rho)
-    numLanes = 2; % Number of lanes per each segment % FIXME: make it global
-    numSegments = 5; % FIXME: make it global
-
+function v_lim_opt = runOptimization(rho,numSegments, numLanes)
     % This function calculates the optimal speed limit for each road segment based
     % on the current traffic density. It uses a nonlinear optimization routine
     % provided by MATLAB's fmincon function.
@@ -47,37 +44,6 @@ function v_lim_opt = runOptimization(rho)
         @(v_lim) constraints(v_lim, x, t, rho), ...
         options);
     v_lim_opt = round(v_lim_opt);
-
-    
-    % Display the optimized speed limits
-    disp('Optimal speed limit:');
-    disp(v_lim_opt);
-    
-    % Determine the actual number of lanes and segments
-    [numSegments, numLanes] = size(v_lim_opt);
-    % Plot the optimized speed limits for each lane
-    % Create or refresh the figure
-    clf; % Clear the current figure
-
-    % Generate x based on the number of segments
-    x = linspace(0, 10, numSegments); % Assuming a 10 km road segment
-
-    for segment = 1:numSegments
-        for lane = 1:numLanes
-            subplot(numSegments, numLanes, (segment - 1) * numLanes + lane);
-            plot(x, ones(size(x)) * v_lim_opt(segment, lane), 'b-', 'LineWidth', 2);
-            xlabel('Position on Road [km]');
-            ylabel('Rec Spd [km/h]'); % Recommended Speed
-            ylim([v_lim_opt(segment, lane)-10, v_lim_opt(segment, lane)+10]); % Set the y-axis limits
-            grid on;
-
-            % Add a subtitle
-            title(['Segment ', num2str(segment), ', Lane ', num2str(lane)]);
-        end
-    end
-    % Set a common title for all subplots
-    sgtitle('Optimal Speed Limit Distribution for Multi-Lane Road');
-
 end
 
 
