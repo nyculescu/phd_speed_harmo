@@ -1,6 +1,6 @@
 % The function won't report any error at this point - assuming the init
 % will be successful 
-function [densityRange, speedRange] = initSystemConditionObserver(numSegments, numLanes, sensorData)
+function [densityRange, speedRange] = initSensorData_Mock(numSegments, numLanes, sensorData)
     % Traffic density (vehicles per km per lane)
     densityRange = [20, 100]; % Minimum and maximum density
     sensorData.density = randi(densityRange, numSegments, numLanes);

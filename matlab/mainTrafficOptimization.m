@@ -1,39 +1,51 @@
 function mainTrafficOptimization()
-    addpath 'D:\phd_ws\speed_harmo\phd_speed_harmo\matlab\system_monitoring'
+    addpath './system_monitoring'
+    addpath './input_data'
 
-    % Set the maximum values for random data generation
-    maxDensity = 50;
-    maxEnv = 10;
-    maxRoad = 5;
-    numSegments = 5; % Number of road segments
-    numLanes = 2; % Number of lanes per each segment
+    [numSegments, numLanes] = deal(4, 3); % Example values
     
-    sensorData = struct();
-    [densityRange, speedRange] = initSystemConditionObserver(numSegments, numLanes, sensorData);
+    sensorData = struct(); % Real-time data
+    [densityRange_sensor, speedRange_sensor] = initSensorData_Mock(numSegments, numLanes, sensorData);
 
-    % Define how often to update the data (in seconds)
-    updateInterval = 3;
-    cycle = 0; % Initialize
+    localData = struct(); % Data stored and/or data predicted by ML-based sub-system
+    % The local data is used to fusion (or augment) with or replace the sensor data
+    [densityRange_local, speedRange_local] = initLocalData(numSegments, numLanes, localData);
+
+    mainLoopCycleUpdateInterval = 3; % how often to update the data [seconds]
+    mainLoopCycle = 0; % Initialize
+
+    [trafficData, environmentalData, roadSurfaceData] = initTrafficData_Mock(numSegments, numLanes);
 
     %% The main loop code
     while true
-        [rho, env_conditions, road_conditions] = generateTrafficData(maxDensity, maxEnv, maxRoad, cycle, numSegments, numLanes);
-        % Call the optimization routine with the new data
-        v_lim_opt = runOptimization(rho, numSegments, numLanes);
+        % Retreieve real-time measured conditions: % FIXME: At this moment, they are mocked 
+        % 1. Traffic conditions
+        % 2. Environmental conditions
+        % 3. Road surface conditions
+        % 4. Location and motion information of the vehicles passing the lane. FIXME: not needed at this moment
+        [trafficData, environmentalData, roadSurfaceData] = getTrafficData_Mock(numSegments, numLanes, trafficData, environmentalData, roadSurfaceData);
+        displayTrafficData(trafficData, environmentalData, roadSurfaceData, mainLoopCycle);
 
-        displayGridRhoValue(v_lim_opt, numSegments, numLanes);
+        % Call the optimization routine
+        v_lim_opt = getOptimalSpeedLimits(mainLoopCycle, numSegments, numLanes, trafficData, environmentalData, roadSurfaceData);
         
-        runSystemConditionObserver(numSegments, numLanes, sensorData, densityRange, speedRange);
+        % Plot the optimized speed limits for each lane
+        displayGridRhoValue(v_lim_opt, numSegments, numLanes, mainLoopCycle);
+        
+        % Check the System health: operational status of the sensors and the system as a whole, 
+        % including fault data and cybersecurity threats
+        runSystemConditionObserver(numSegments, numLanes, sensorData, densityRange_sensor, speedRange_sensor);
 
-        cycle = cycle + 0.1; % Increment cycle for next iteration
         % Wait for the next update
-        pause(updateInterval);
+        mainLoopCycle = mainLoopCycle + 1;
+        pause(mainLoopCycleUpdateInterval);
     end
 end
 
-function displayGridRhoValue(v_lim_opt, numSegments, numLanes)
+function displayGridRhoValue(v_lim_opt, numSegments, numLanes, mainLoopCycle)
 % Display the optimized speed limits
-    disp('Optimal speed limit:');
+    disp_out = ['Optimal speed limit at iteration ', num2str(mainLoopCycle)];
+    disp(disp_out);
     disp(v_lim_opt);
 
     % Plot the optimized speed limits for each lane
@@ -58,4 +70,24 @@ function displayGridRhoValue(v_lim_opt, numSegments, numLanes)
     end
     % Set a common title for all subplots
     sgtitle('Optimal Speed Limit Distribution for Multi-Lane Road');
+end
+
+function displayTrafficData(trafficData, environmentalData, roadSurfaceData, mainLoopCycle)
+    % Convert structures to tables
+    trafficDataTable = struct2table(trafficData);
+    environmentalDataTable = struct2table(environmentalData);
+    roadSurfaceDataTable = struct2table(roadSurfaceData);
+    
+    disp_out = ['Traffic, Environmental and Road Surface Data Tables at iteration ', num2str(mainLoopCycle)];
+    disp(disp_out);
+
+    % Display tables
+    disp('Traffic Data Table:');
+    disp(trafficDataTable);
+    
+    disp('Environmental Data Table:');
+    disp(environmentalDataTable);
+    
+    disp('Road Surface Data Table:');
+    disp(roadSurfaceDataTable);
 end
