@@ -11,7 +11,7 @@ function [trafficData, environmentalData, roadSurfaceData] = initTrafficData_Moc
     % Environmental Data
     minTemperature = -40;       % Minimum temperature in Celsius
     maxTemperature = 45;        % Maximum temperature in Celsius
-    maxWindSpeed = 100;         % Maximum wind speed in km/h
+    maxWindSpeed = 75;          % Maximum wind speed in km/h
     maxHumidity = 100;          % Maximum humidity percentage
     maxPrecipitation = 100;     % Maximum precipitation in mm/h
     maxVisibility = 10;         % Maximum visibility in km
@@ -21,7 +21,7 @@ function [trafficData, environmentalData, roadSurfaceData] = initTrafficData_Moc
     maxSurfaceTemp = 60;        % Maximum surface temperature in Celsius
     maxMoistureLevel = 100;     % Maximum moisture level percentage
     maxIcing = 100;             % Maximum icing percentage
-    maxSalinity = 70;           % Maximum salinity percentage
+    maxSalinity = 25;           % Maximum salinity percentage
 
     % Initialize data structures
     trafficData = struct('speed', zeros(numSegments, numLanes), ...
@@ -43,14 +43,61 @@ function [trafficData, environmentalData, roadSurfaceData] = initTrafficData_Moc
     baseWindSpeed = maxWindSpeed * rand;
     baseHumidity = maxHumidity * rand;
     basePrecipitation = maxPrecipitation * rand;
-    baseVisibility = maxVisibility * rand;
     % Road Surface Data
-    baseSurfaceTemperature = minSurfaceTemp + (maxSurfaceTemp - minSurfaceTemp) * rand;
-    baseMoisture = maxMoistureLevel * rand;
-    baseIcing = maxIcing * rand;
-    baseSalinity = maxSalinity * rand;
+    baseMoisture = 0;
+    baseIcing = 0;
+    
+    if basePrecipitation < 10
+        if baseTemperature > 40
+            baseSurfaceTemperature = baseTemperature + 10;
+            baseVisibility = 100;
+        elseif baseTemperature > 35
+            baseSurfaceTemperature = baseTemperature + 8.5;
+            baseVisibility = 100;
+        elseif baseTemperature > 30
+            baseSurfaceTemperature = baseTemperature + 6;
+            baseVisibility = 100;
+        elseif baseTemperature > 25
+            baseSurfaceTemperature = baseTemperature + 4.5;
+            baseVisibility = 75 + (100-75).*rand(1,1);
+        elseif baseTemperature > 20
+            baseSurfaceTemperature = baseTemperature + 3;
+            baseVisibility = 50 + (100-50).*rand(1,1);
+        elseif baseTemperature > 10
+            baseSurfaceTemperature = baseTemperature + 1.5;
+            baseVisibility = 35 + (100-35).*rand(1,1);
+            baseMoisture = 5;
+        else
+            baseSurfaceTemperature = baseTemperature;
+            baseMoisture = 10;
+            baseVisibility = 25 + (100-25).*rand(1,1);
+            baseIcing = 10 * basePrecipitation * 1 / baseSurfaceTemperature;
+        end
+    else
+        baseMoisture = 10 + (100-10).*rand(1,1);
+        baseSurfaceTemperature = baseTemperature;
+        baseVisibility = 25 + (100-25).*rand(1,1);
+        baseIcing = abs(10 * basePrecipitation * 1 / baseSurfaceTemperature);
+    end
 
-    % Generate base density (randomly between 0 and maxDensity)
+    baseSalinity = maxSalinity * rand;
+    if basePrecipitation > 10 % Threshold for heavy rain
+        baseSalinity = baseSalinity * 0.8; % Reduce salinity by 20%
+    end
+
+    if baseWindSpeed > 50 % Threshold for high wind
+        baseVisibility = baseVisibility * 0.01 * baseWindSpeed; % Reduce visibility
+    end
+
+    if baseSurfaceTemperature < 0
+        baseIcing = baseIcing * 1.25; % Increase icing by 25%
+    end
+    
+    if baseSalinity > 5
+        baseIcing = baseIcing * 0.75; % Reduce icing by 25%
+    end
+
+    % Generate base Occupancy
     baseOccupancy = rand * maxOccupancy;
 
     %% Generate mock data for each segment and lane
