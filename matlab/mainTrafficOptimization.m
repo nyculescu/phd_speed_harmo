@@ -3,9 +3,6 @@ function mainTrafficOptimization()
     addpath './input_data'
 
     [numSegments, numLanes] = deal(4, 3); % Example values
-    
-    sensorData = struct(); % Real-time data
-    [densityRange_sensor, speedRange_sensor] = initSensorData_Mock(numSegments, numLanes, sensorData);
 
     localData = struct(); % Data stored and/or data predicted by ML-based sub-system
     % The local data is used to fusion (or augment) with or replace the sensor data
@@ -34,7 +31,13 @@ function mainTrafficOptimization()
         
         % Check the System health: operational status of the sensors and the system as a whole, 
         % including fault data and cybersecurity threats
-        runSystemConditionObserver(numSegments, numLanes, sensorData, densityRange_sensor, speedRange_sensor);
+        RsuData = struct();
+        RsuData.traffic = trafficData;
+        RsuData.environmental = environmentalData;
+        RsuData.roadSurface = roadSurfaceData;
+        densityRange_sensor = 10;
+        speedRange_sensor = 10;
+        runSystemConditionObserver(numSegments, numLanes, RsuData, densityRange_sensor, speedRange_sensor);
 
         % Wait for the next update
         mainLoopCycle = mainLoopCycle + 1;

@@ -1,14 +1,14 @@
 % System Overall Monitoringing Module
 % FIXME: At this moment, this is a mock function
-function runSystemConditionObserver(numSegments, numLanes, sensorData, densityRange, speedRange)
+function runSystemConditionObserver(numSegments, numLanes, RsuData, densityRange, speedRange)
     % Check the operational status of each sensor
     isSystemHealthy = true;
     healthReport = struct();
     
     % Update sensor data
-    sensorData.density = randi(densityRange, numSegments, numLanes);
-    sensorData.speed = randi(speedRange, numSegments, numLanes);
-    sensorData.environment = rand(numSegments, 1) * 10;
+    RsuData.trafficData.volume = randi(densityRange, numSegments, numLanes);
+    RsuData.trafficData.speed = randi(speedRange, numSegments, numLanes);
+    RsuData.trafficData.occupancy = rand(numSegments, 1) * 10;
    
     % Update sensor status (simulating changes over time)
     for i = 1:numSegments
@@ -22,9 +22,9 @@ function runSystemConditionObserver(numSegments, numLanes, sensorData, densityRa
     end
 
     % Perform checks
-    [isDataValid, anomalyReport] = checkDataIntegrity(sensorData);
+    [isDataValid, anomalyReport] = checkDataIntegrity(RsuData);
     [isSystemHealthy, healthReport] = monitorSystemHealth(sensorStatus);
-    [isSystemSecure, securityReport] = monitorCybersecurity(sensorData);
+    [isSystemSecure, securityReport] = monitorCybersecurity(RsuData);
     
     % Handle any detected issues
     handleSystemFailures(isDataValid, anomalyReport, isSystemHealthy, healthReport, isSystemSecure, securityReport);
