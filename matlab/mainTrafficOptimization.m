@@ -20,25 +20,18 @@ function mainTrafficOptimization()
         % 2. Environmental conditions
         % 3. Road surface conditions
         % 4. Location and motion information of the vehicles passing the lane. FIXME: not needed at this moment
-        [trafficData, environmentalData, roadSurfaceData] = getTrafficData_Mock(numSegments, numLanes, trafficData, environmentalData, roadSurfaceData);
-        displayTrafficData(trafficData, environmentalData, roadSurfaceData, mainLoopCycle);
+        RsuData = getTrafficData_Mock(numSegments, numLanes, trafficData, environmentalData, roadSurfaceData);
+        displayTrafficData(RsuData, mainLoopCycle);
+        % Check the System health: operational status of the sensors and the system as a whole, 
+        % including fault data and cybersecurity threats
+        runSystemConditionObserver(numSegments, numLanes, RsuData, 10, 10);
 
         % Call the optimization routine
-        v_lim_opt = getOptimalSpeedLimits(mainLoopCycle, numSegments, numLanes, trafficData, environmentalData, roadSurfaceData);
+        v_lim_opt = getOptimalSpeedLimits(mainLoopCycle, numSegments, numLanes, RsuData);
         
         % Plot the optimized speed limits for each lane
         displayGridRhoValue(v_lim_opt, numSegments, numLanes, mainLoopCycle);
         
-        % Check the System health: operational status of the sensors and the system as a whole, 
-        % including fault data and cybersecurity threats
-        RsuData = struct();
-        RsuData.traffic = trafficData;
-        RsuData.environmental = environmentalData;
-        RsuData.roadSurface = roadSurfaceData;
-        densityRange_sensor = 10;
-        speedRange_sensor = 10;
-        runSystemConditionObserver(numSegments, numLanes, RsuData, densityRange_sensor, speedRange_sensor);
-
         % Wait for the next update
         mainLoopCycle = mainLoopCycle + 1;
         pause(mainLoopCycleUpdateInterval);
@@ -75,11 +68,11 @@ function displayGridRhoValue(v_lim_opt, numSegments, numLanes, mainLoopCycle)
     sgtitle('Optimal Speed Limit Distribution for Multi-Lane Road');
 end
 
-function displayTrafficData(trafficData, environmentalData, roadSurfaceData, mainLoopCycle)
+function displayTrafficData(RsuData, mainLoopCycle)
     % Convert structures to tables
-    trafficDataTable = struct2table(trafficData);
-    environmentalDataTable = struct2table(environmentalData);
-    roadSurfaceDataTable = struct2table(roadSurfaceData);
+    trafficDataTable = struct2table(RsuData.traffic);
+    environmentalDataTable = struct2table(RsuData.environmental);
+    roadSurfaceDataTable = struct2table(RsuData.roadSurface);
     
     disp_out = ['Traffic, Environmental and Road Surface Data Tables at iteration ', num2str(mainLoopCycle)];
     disp(disp_out);

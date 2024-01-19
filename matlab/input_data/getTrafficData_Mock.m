@@ -1,4 +1,4 @@
-function [trafficData, environmentalData, roadSurfaceData] = getTrafficData_Mock(numSegments, numLanes, trafficData, environmentalData, roadSurfaceData)
+function [RsuData] = getTrafficData_Mock(numSegments, numLanes, trafficData, environmentalData, roadSurfaceData)
     % This function slightly adjusts traffic, environmental, and road surface data
     % to simulate dynamic changes over time (cycles).
 
@@ -43,6 +43,10 @@ function [trafficData, environmentalData, roadSurfaceData] = getTrafficData_Mock
         roadSurfaceData.icing(i) = adjustWithinRange(roadSurfaceData.icing(i), maxIcingChange, 0, 100);
         roadSurfaceData.salinity(i) = adjustWithinRange(roadSurfaceData.salinity(i), maxSalinityChange, 0, 100);
     end
+
+    RsuData.traffic = trafficData;
+    RsuData.environmental = environmentalData;
+    RsuData.roadSurface = roadSurfaceData;
 end
 
 function newValue = adjustWithinRange(value, maxChange, minLimit, maxLimit)

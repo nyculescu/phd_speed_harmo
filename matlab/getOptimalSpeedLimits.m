@@ -1,4 +1,5 @@
-function [optimalSpeedLimits] = getOptimalSpeedLimits(mainLoopCycle, numSegments, numLanes, trafficData, environmentalData, roadSurfaceData)
+function [optimalSpeedLimits] = getOptimalSpeedLimits(mainLoopCycle, ...
+    numSegments, numLanes, RsuData)
     % This function calculates the optimal speed limits for road segments
     % to minimize traffic flow, considering various constraints.
 
@@ -9,16 +10,21 @@ function [optimalSpeedLimits] = getOptimalSpeedLimits(mainLoopCycle, numSegments
     ub = 120 * ones(numSegments, numLanes); % Upper bounds for speed limits
 
     % Define the objective function
-    objectiveFunction = @(v_opt) calculateTotalFlow(v_opt, trafficData, environmentalData, roadSurfaceData);
+    objectiveFunction = @(v_opt) calculateTotalFlow(v_opt, RsuData.traffic, ...
+        RsuData.environmental, RsuData.roadSurface);
 
     % Define the nonlinear constraints
-    nonlcon = @(v_opt) systemConstraints(v_opt, trafficData, environmentalData, roadSurfaceData);
+    nonlcon = @(v_opt) systemConstraints(v_opt, RsuData.traffic, RsuData.environmental, ...
+        RsuData.roadSurface);
 
     % Solve Optimization Problem
-    [optimalSpeedLimits, ~] = fmincon(objectiveFunction, initialGuess, [], [], [], [], lb, ub, nonlcon, opts);
+    [optimalSpeedLimits, ~] = fmincon(objectiveFunction, initialGuess, ...
+        [], [], [], [], lb, ub, nonlcon, opts);
 end
 
-function totalFlow = calculateTotalFlow(v_opt, trafficData, environmentalData, roadSurfaceData)
+%% Total Flow
+function totalFlow = calculateTotalFlow(v_opt, trafficData, environmentalData, ...
+    roadSurfaceData)
     % This function calculates the total flow based on the given speed limits,
     % traffic, environmental, and road surface conditions.
 
@@ -35,8 +41,12 @@ function totalFlow = calculateTotalFlow(v_opt, trafficData, environmentalData, r
             % Extract data for the current segment and lane
             currentSpeed = v_opt(i, j);
             vehicleCount = trafficData.volume(i, j); % Use volume for vehicle count
-            environmentalFactors = [environmentalData.temperature(i), environmentalData.windSpeed(i), environmentalData.humidity(i), environmentalData.precipitation(i), environmentalData.visibility(i)];
-            roadSurfaceFactors = [roadSurfaceData.surfaceTemperature(i), roadSurfaceData.moisture(i), roadSurfaceData.icing(i), roadSurfaceData.salinity(i)];
+            environmentalFactors = [environmentalData.temperature(i), ...
+                environmentalData.windSpeed(i), environmentalData.humidity(i), ...
+                environmentalData.precipitation(i), environmentalData.visibility(i)];
+            roadSurfaceFactors = [roadSurfaceData.surfaceTemperature(i), ...
+                roadSurfaceData.moisture(i), roadSurfaceData.icing(i), ...
+                roadSurfaceData.salinity(i)];
 
             % Adjust speed based on environmental and road surface conditions
             adjustedSpeed = adjustSpeedForConditions(currentSpeed, environmentalFactors, roadSurfaceFactors);
