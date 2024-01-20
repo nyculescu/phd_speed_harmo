@@ -1,10 +1,13 @@
-function [trafficData, environmentalData, roadSurfaceData] = initTrafficData_Mock(numSegments, numLanes)
+function [trafficData, environmentalData, roadSurfaceData, speedBounds] = initTrafficData_Mock(numSegments, numLanes)
     % This function generates mock data for traffic, environmental, and road surface conditions
     % with variability between road segments.
 
     % Constants for data ranges
     % Traffic Data
-    maxSpeed = 130;             % Maximum speed in km/h
+    speedBounds = struct();
+    speedBounds.maxSpeed = 130 * ones(numSegments, numLanes); % Maximum speed in km/h %FIXME: for now, all lanes have 130 as max pseed limit
+    speedBounds.minSpeed = 5 * ones(numSegments, numLanes);
+
     maxVolume = 500;            % (Flow) Maximum volume of vehicles per hour per lane, peak flow
     maxOccupancy = 100;         % (Density) Maximum occupancy percentage, vehicles per km, jam density
 
@@ -102,6 +105,7 @@ function [trafficData, environmentalData, roadSurfaceData] = initTrafficData_Moc
 
     %% Generate mock data for each segment and lane
     for i = 1:numSegments
+        ix = uint32(i);
         % Environmental Data
         environmentalData.temperature(i) = adjustWithinRange(baseTemperature, 0.25, minTemperature, maxTemperature);
         environmentalData.windSpeed(i) = adjustWithinRange(baseWindSpeed, 2, 0, maxWindSpeed);
@@ -116,10 +120,11 @@ function [trafficData, environmentalData, roadSurfaceData] = initTrafficData_Moc
         roadSurfaceData.salinity(i) = adjustWithinRange(baseSalinity, 1, 0, maxSalinity);
 
         % Initial values for the first lane in each segment
-        baseSpeed = rand * maxSpeed * (0.8 + 0.2 * rand); % Random base speed for the first lane
+        baseSpeed = rand * speedBounds.maxSpeed(ix, 1) * (0.8 + 0.2 * rand); % Random base speed for the first lane
         % baseVolume = rand * maxVolume * (0.8 + 0.2 * rand); % Random base volume for the first lane
 
         for j = 1:numLanes
+            jx = uint32(j);
             % Adjust values for each lane, ensuring lane 1 < lane 2 < lane 3
             laneDifferenceSpeed = 2 + 3 * rand; % 2 to 5 km/h difference
             % laneDifferenceVolume = 2 + 3 * rand; % Similar logic for volume
@@ -133,7 +138,7 @@ function [trafficData, environmentalData, roadSurfaceData] = initTrafficData_Moc
             end
 
             % Speed-Density Relationship (linear model)
-            trafficData.speed(i, j) = maxSpeed * (1 - (baseOccupancy / maxOccupancy));
+            trafficData.speed(i, j) = speedBounds.maxSpeed(ix,jx) * (1 - (baseOccupancy / maxOccupancy));
             
             % Setting Volume and Occupancy based on Flow and Density
             trafficData.volume(i, j) = trafficData.volume(i, j); % Assuming flow represents volume
@@ -145,7 +150,7 @@ function [trafficData, environmentalData, roadSurfaceData] = initTrafficData_Moc
                 baseSpeed = adjustWithinRange(baseSpeed, 25, previousSegmentSpeed - 25, previousSegmentSpeed + 25);
             end
 
-            trafficData.speed(i, j) = adjustWithinRange(baseSpeed + (j-1) * laneDifferenceSpeed, 5, 0, maxSpeed);
+            trafficData.speed(i, j) = adjustWithinRange(baseSpeed + (j-1) * laneDifferenceSpeed, 5, 0, speedBounds.maxSpeed(ix,jx));
             % trafficData.volume(i, j) = adjustWithinRange(baseVolume + (j-1) * laneDifferenceVolume, 10, 0, maxVolume);
             trafficData.occupancy(i, j) = adjustWithinRange(baseOccupancy + (j-1) * laneDifferenceOccupancy, 5, 0, maxOccupancy);
             

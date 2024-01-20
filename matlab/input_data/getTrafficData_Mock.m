@@ -1,4 +1,5 @@
-function [RsuData] = getTrafficData_Mock(numSegments, numLanes, trafficData, environmentalData, roadSurfaceData)
+function [RsuData] = getTrafficData_Mock(numSegments, numLanes, ...
+    trafficData, environmentalData, roadSurfaceData, speedBounds)
     % This function slightly adjusts traffic, environmental, and road surface data
     % to simulate dynamic changes over time (cycles).
 
@@ -21,7 +22,8 @@ function [RsuData] = getTrafficData_Mock(numSegments, numLanes, trafficData, env
     % Adjust traffic data
     for i = 1:numSegments
         for j = 1:numLanes
-            trafficData.speed(i, j) = adjustWithinRange(trafficData.speed(i, j), maxSpeedChange, 0, 120);
+            ix = uint32(i); jx = uint32(j);
+            trafficData.speed(i, j) = adjustWithinRange(trafficData.speed(i, j), maxSpeedChange, 0, speedBounds.maxSpeed(ix, jx));
             trafficData.volume(i, j) = adjustWithinRange(trafficData.volume(i, j), maxVolumeChange, 0, 500);
             trafficData.occupancy(i, j) = adjustWithinRange(trafficData.occupancy(i, j), maxOccupancyChange, 0, 100);
         end

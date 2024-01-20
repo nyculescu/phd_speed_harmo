@@ -11,7 +11,7 @@ function mainTrafficOptimization()
     mainLoopCycleUpdateInterval = 3; % how often to update the data [seconds]
     mainLoopCycle = 0; % Initialize
 
-    [trafficData, environmentalData, roadSurfaceData] = initTrafficData_Mock(numSegments, numLanes);
+    [trafficData, environmentalData, roadSurfaceData, speedBounds] = initTrafficData_Mock(numSegments, numLanes);
 
     %% The main loop code
     while true
@@ -20,14 +20,15 @@ function mainTrafficOptimization()
         % 2. Environmental conditions
         % 3. Road surface conditions
         % 4. Location and motion information of the vehicles passing the lane. FIXME: not needed at this moment
-        RsuData = getTrafficData_Mock(numSegments, numLanes, trafficData, environmentalData, roadSurfaceData);
+        RsuData = getTrafficData_Mock(numSegments, numLanes, ...
+            trafficData, environmentalData, roadSurfaceData, speedBounds);
         displayTrafficData(RsuData, mainLoopCycle);
         % Check the System health: operational status of the sensors and the system as a whole, 
         % including fault data and cybersecurity threats
         runSystemConditionObserver(numSegments, numLanes, RsuData, 10, 10);
 
         % Call the optimization routine
-        v_lim_opt = getOptimalSpeedLimits(mainLoopCycle, numSegments, numLanes, RsuData);
+        v_lim_opt = getOptimalSpeedLimits(mainLoopCycle, numSegments, numLanes, RsuData, speedBounds);
         
         % Plot the optimized speed limits for each lane
         displayGridRhoValue(v_lim_opt, numSegments, numLanes, mainLoopCycle);
