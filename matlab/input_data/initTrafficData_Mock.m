@@ -8,7 +8,7 @@ function [trafficData, environmentalData, roadSurfaceData, speedBounds] = initTr
     speedBounds.maxSpeed = 130 * ones(numSegments, numLanes); % Maximum speed in km/h %FIXME: for now, all lanes have 130 as max pseed limit
     speedBounds.minSpeed = 5 * ones(numSegments, numLanes);
 
-    maxVolume = 500;            % (Flow) Maximum volume of vehicles per hour per lane, peak flow
+    maxFlow = 2600;           % (Flow) Maximum volume of vehicles per hour per lane, peak flow
     maxOccupancy = 100;         % (Density) Maximum occupancy percentage, vehicles per km, jam density
 
     % Environmental Data
@@ -99,13 +99,14 @@ function [trafficData, environmentalData, roadSurfaceData, speedBounds] = initTr
     if baseSalinity > 5
         baseIcing = baseIcing * 0.75; % Reduce icing by 25%
     end
-
+    
     % Generate base Occupancy
-    baseOccupancy = rand * maxOccupancy;
+    % baseOccupancy = rand * maxOccupancy;
 
     %% Generate mock data for each segment and lane
     for i = 1:numSegments
         ix = uint32(i);
+
         % Environmental Data
         environmentalData.temperature(i) = adjustWithinRange(baseTemperature, 0.25, minTemperature, maxTemperature);
         environmentalData.windSpeed(i) = adjustWithinRange(baseWindSpeed, 2, 0, maxWindSpeed);
@@ -121,7 +122,10 @@ function [trafficData, environmentalData, roadSurfaceData, speedBounds] = initTr
 
         % Initial values for the first lane in each segment
         baseSpeed = rand * speedBounds.maxSpeed(ix, 1) * (0.8 + 0.2 * rand); % Random base speed for the first lane
-        % baseVolume = rand * maxVolume * (0.8 + 0.2 * rand); % Random base volume for the first lane
+        % maxFlow = rand * maxFlow * (0.8 + 0.2 * rand); % Random base volume for the first lane
+        
+        % Generate base Occupancy
+        baseOccupancy = adjustWithinRange();
 
         for j = 1:numLanes
             jx = uint32(j);
@@ -132,9 +136,9 @@ function [trafficData, environmentalData, roadSurfaceData, speedBounds] = initTr
             
             % Flow-Density Relationship (simplified piecewise linear model)
             if baseOccupancy <= maxOccupancy / 2
-                trafficData.volume(i, j) = (maxVolume / (maxOccupancy / 2)) * baseOccupancy;
+                trafficData.flow(i, j) = (maxFlow / (maxOccupancy / 2)) * baseOccupancy;
             else
-                trafficData.volume(i, j) = maxVolume - (maxVolume / (maxOccupancy / 2)) * (baseOccupancy - maxOccupancy / 2);
+                trafficData.flow(i, j) = maxFlow - (maxFlow / (maxOccupancy / 2)) * (baseOccupancy - maxOccupancy / 2);
             end
 
             % Speed-Density Relationship (linear model)
@@ -151,7 +155,7 @@ function [trafficData, environmentalData, roadSurfaceData, speedBounds] = initTr
             end
 
             trafficData.speed(i, j) = adjustWithinRange(baseSpeed + (j-1) * laneDifferenceSpeed, 5, 0, speedBounds.maxSpeed(ix,jx));
-            % trafficData.volume(i, j) = adjustWithinRange(baseVolume + (j-1) * laneDifferenceVolume, 10, 0, maxVolume);
+            % trafficData.flow(i, j) = adjustWithinRange(baseFlow + (j-1) * laneDifferenceFlow, 10, 0, maxFlow);
             trafficData.occupancy(i, j) = adjustWithinRange(baseOccupancy + (j-1) * laneDifferenceOccupancy, 5, 0, maxOccupancy);
             
             % Calculate traffic density based on volume and speed
