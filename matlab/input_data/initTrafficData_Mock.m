@@ -2,29 +2,10 @@ function [trafficData, environmentalData, roadSurfaceData, speedBounds] = initTr
     % This function generates mock data for traffic, environmental, and road surface conditions
     % with variability between road segments.
 
-    % Constants for data ranges
-    % Traffic Data
+    % Speed limit bounds
     speedBounds = struct();
     speedBounds.maxSpeed = 130 * ones(numSegments, numLanes); % Maximum speed in km/h %FIXME: for now, all lanes have 130 as max pseed limit
     speedBounds.minSpeed = 5 * ones(numSegments, numLanes);
-
-    maxFlow = 2600;             % Maximum volume of vehicles per hour per lane, peak flow
-    maxDensity = 100;           % Maximum occupancy percentage, vehicles per km, jam density
-
-    % Environmental Data
-    minTemperature = -40;       % Minimum temperature in Celsius
-    maxTemperature = 45;        % Maximum temperature in Celsius
-    maxWindSpeed = 75;          % Maximum wind speed in km/h
-    maxHumidity = 100;          % Maximum humidity percentage
-    maxPrecipitation = 100;     % Maximum precipitation in mm/h
-    maxVisibility = 10;         % Maximum visibility in km
-
-    % Road Surface Data
-    minSurfaceTemp = -30;       % Minimum surface temperature in Celsius
-    maxSurfaceTemp = 60;        % Maximum surface temperature in Celsius
-    maxMoistureLevel = 100;     % Maximum moisture level percentage
-    maxIcing = 100;             % Maximum icing percentage
-    maxSalinity = 25;           % Maximum salinity percentage
 
     % Initialize data structures
     trafficData = struct('speed', zeros(numSegments, numLanes), ...
@@ -39,14 +20,40 @@ function [trafficData, environmentalData, roadSurfaceData, speedBounds] = initTr
                              'moisture', zeros(numSegments, 1), ...
                              'icing', zeros(numSegments, 1), ...
                              'salinity', zeros(numSegments, 1));
+        
+    [environmentalData, roadSurfaceData] = initEnvironmentAndSurface(numSegments, environmentalData, roadSurfaceData);
     
-    %% Generate mock data for the whole environment containing all the segments and lanes
+    trafficData = initTrafficFlow(numSegments, numLanes, trafficData, speedBounds);
+end
+
+function newValue = adjustWithinRange(value, maxChange, minLimit, maxLimit)
+    % Randomly adjust the value within the specified range
+    change = maxChange * (2 * rand - 1); % Change can be positive or negative
+    newValue = value + change;
+    % Ensure the new value is within limits
+    newValue = min(max(newValue, minLimit), maxLimit);
+end
+
+%% Generate Environmental and Road Surface mock data for each segment
+function [environmentalData, roadSurfaceData] = initEnvironmentAndSurface(numSegments, environmentalData, roadSurfaceData)
     % Environmental Data
+    minTemperature = -40;       % Minimum temperature in Celsius
+    maxTemperature = 45;        % Maximum temperature in Celsius
+    maxWindSpeed = 75;          % Maximum wind speed in km/h
+    maxHumidity = 100;          % Maximum humidity percentage
+    maxPrecipitation = 100;     % Maximum precipitation in mm/h
+    maxVisibility = 10;         % Maximum visibility in km
     baseTemperature = minTemperature + (maxTemperature - minTemperature) * rand;
     baseWindSpeed = maxWindSpeed * rand;
     baseHumidity = maxHumidity * rand;
     basePrecipitation = maxPrecipitation * rand;
+
     % Road Surface Data
+    minSurfaceTemp = -30;       % Minimum surface temperature in Celsius
+    maxSurfaceTemp = 60;        % Maximum surface temperature in Celsius
+    maxMoistureLevel = 100;     % Maximum moisture level percentage
+    maxIcing = 100;             % Maximum icing percentage
+    maxSalinity = 25;           % Maximum salinity percentage
     baseMoisture = 0;
     baseIcing = 0;
     
@@ -99,14 +106,8 @@ function [trafficData, environmentalData, roadSurfaceData, speedBounds] = initTr
     if baseSalinity > 5
         baseIcing = baseIcing * 0.75; % Reduce icing by 25%
     end
-    
-    % Generate base Density
-    baseDensity = rand * maxDensity;
 
-    %% Generate mock data for each segment and lane
     for i = 1:numSegments
-        ix = uint32(i);
-
         % Environmental Data
         environmentalData.temperature(i) = adjustWithinRange(baseTemperature, 0.25, minTemperature, maxTemperature);
         environmentalData.windSpeed(i) = adjustWithinRange(baseWindSpeed, 2, 0, maxWindSpeed);
@@ -119,60 +120,73 @@ function [trafficData, environmentalData, roadSurfaceData, speedBounds] = initTr
         roadSurfaceData.moisture(i) = adjustWithinRange(baseMoisture, 2, 0, maxMoistureLevel);
         roadSurfaceData.icing(i) = adjustWithinRange(baseIcing, 2.5, 0, maxIcing);
         roadSurfaceData.salinity(i) = adjustWithinRange(baseSalinity, 1, 0, maxSalinity);
+    end
+end
 
-        % Initial values for the first lane in each segment
-        baseSpeed = rand * speedBounds.maxSpeed(ix, 1) * (0.8 + 0.2 * rand); % Random base speed for the first lane
-        % maxFlow = rand * maxFlow * (0.8 + 0.2 * rand); % Random base volume for the first lane
-        
-        % Generate base Density
-        % baseDensity = adjustWithinRange();
+%% Generate Traffic Flow mock data for each segment
+function trafficData = initTrafficFlow(numSegments, numLanes, trafficData, speedBounds)
+    for i = 1:numSegments
+        ix = uint32(i);
+
+        % The variables of flow, density, and space mean speed are related
+        % definitionally as flow = density x space mean speed
+    
+        % Assuming a normal distribution centered around half the maxDensity
+        maxDensity = 40; % Maximum occupancy [vehicles/km/lane]
+        baseDensity = getDensity(maxDensity);
+
+        % Speed Calculation considering different traffic conditions
+        baseSpeed = getSpeedBasedOnDensity(maxDensity, baseDensity, speedBounds, ix);
+
+        % Flow Calculation with variability
+        % maxFlow = 40; % Not required
+        baseFlow = baseDensity * baseSpeed * (1 + randn() * 0.1); % Add 10% variability
+
+        % Traffic jam thresholds
+        if baseFlow > 2600 || baseDensity >= 40 || baseSpeed < 50
+            trafficJam = 1;
+        else
+            trafficJam = 0;
+        end
 
         for j = 1:numLanes
             jx = uint32(j);
             % Adjust values for each lane, ensuring lane 1 < lane 2 < lane 3
-            laneDifferenceSpeed = 2 + 3 * rand; % 2 to 5 km/h difference
-            % laneDifferenceVolume = 2 + 3 * rand; % Similar logic for volume
-            laneDifferenceDensity = 1 + 4 * rand; % Similar logic for occupancy
-            
-            % Flow-Density Relationship (simplified piecewise linear model)
-            if baseDensity <= maxDensity / 2
-                trafficData.flow(i, j) = (maxFlow / (maxDensity / 2)) * baseDensity;
-            else
-                trafficData.flow(i, j) = maxFlow - (maxFlow / (maxDensity / 2)) * (baseDensity - maxDensity / 2);
-            end
-
-            % Speed-Density Relationship (linear model)
-            trafficData.speed(i, j) = speedBounds.maxSpeed(ix,jx) * (1 - (baseDensity / maxDensity));
-            
-            % Setting Volume and Occupancy based on Flow and Density
-            trafficData.flow(i, j) = trafficData.flow(i, j); % Assuming flow represents volume
-            trafficData.density(i, j) = baseDensity / maxDensity * 100; % Percentage occupancy
-
-            % Ensure that differences across segments do not exceed 25 km/h
-            if j > 1 && i > 1
-                previousSegmentSpeed = trafficData.speed(i-1, j);
-                baseSpeed = adjustWithinRange(baseSpeed, 25, previousSegmentSpeed - 25, previousSegmentSpeed + 25);
-            end
-
+            % laneDifferenceFlow = 2 + 3 * rand; % x to y vehicles/h/lane difference
+            laneDifferenceDensity = (0.01 + 7) * rand; % x to y difference vehicles/km/lane
+            laneDifferenceSpeed = (2/laneDifferenceDensity)^2; % x to y km/h difference
+                        
             trafficData.speed(i, j) = adjustWithinRange(baseSpeed + (j-1) * laneDifferenceSpeed, 5, 0, speedBounds.maxSpeed(ix,jx));
-            % trafficData.flow(i, j) = adjustWithinRange(baseFlow + (j-1) * laneDifferenceFlow, 10, 0, maxFlow);
             trafficData.density(i, j) = adjustWithinRange(baseDensity + (j-1) * laneDifferenceDensity, 5, 0, maxDensity);
-            
-            % Calculate traffic density based on volume and speed
-            % Ensure speed is not zero to avoid division by zero
-            if trafficData.speed(i, j) > 0
-                trafficData.density(i, j) = trafficData.flow(i, j) / trafficData.speed(i, j);
-            else
-                trafficData.density(i, j) = 0; % Assign zero density if speed is zero
-            end
+            trafficData.flow(i, j) = trafficData.speed(i, j) * trafficData.density(i, j);
         end
     end
 end
 
-function newValue = adjustWithinRange(value, maxChange, minLimit, maxLimit)
-    % Randomly adjust the value within the specified range
-    change = maxChange * (2 * rand - 1); % Change can be positive or negative
-    newValue = value + change;
-    % Ensure the new value is within limits
-    newValue = min(max(newValue, minLimit), maxLimit);
+function baseDensity = getDensity(maxDensity) 
+    meanDensity = maxDensity / 2;
+    stdDensity = maxDensity / 6; % Standard deviation
+    baseDensity = max(normrnd(meanDensity, stdDensity), 0);
+    baseDensity = min(baseDensity, maxDensity); % Ensuring density is within realistic bounds
+end
+
+function baseSpeed = getSpeedBasedOnDensity(maxDensity, baseDensity, speedBounds, segment) 
+    jamDensity = maxDensity; % Density at which traffic is jammed
+    % Calculate speed using Greenshields' linear model
+    baseSpeed = speedBounds.maxSpeed(segment, 1) * (1 - baseDensity / jamDensity);
+    % Introduce variability in speed
+    speedVariability = randn() * 5; % Adding variability with a standard deviation of 5 km/h
+    baseSpeed = baseSpeed + speedVariability;
+    % Ensure the speed is not negative or exceeding maxSpeed
+    baseSpeed = max(min(baseSpeed, speedBounds.maxSpeed(segment, 1)), 0);
+end
+
+% Obsolete: adjusting the logistic model parameters doesn't yield satisfactory results
+function baseSpeed = getSpeedBasedOnDensity_old(maxDensity, baseDensity, speedBounds) 
+    k = -0.05; % The Sensitivity Factor determines how quickly speed decreases as density approaches the critical value.
+    criticalDensity = 0.75 * maxDensity; % The density at which traffic conditions start to significantly affect speed
+    % The logistic function is often used in traffic flow models to represent the transition from free flow to congested conditions as density increases
+    speedReductionFactor = @(d) 1./(1 + exp(k*(d - criticalDensity)));
+    baseSpeed = speedBounds.maxSpeed(ix,1) * speedReductionFactor(baseDensity);
+    baseSpeed = baseSpeed + randn() * 2; % Adds Gaussian noise to the base speed. This step introduces variability, simulating real-world unpredictability in speeds.
 end

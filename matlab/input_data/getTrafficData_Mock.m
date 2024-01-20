@@ -23,9 +23,9 @@ function [RsuData] = getTrafficData_Mock(numSegments, numLanes, ...
     for i = 1:numSegments
         for j = 1:numLanes
             ix = uint32(i); jx = uint32(j);
-            trafficData.speed(i, j) = adjustWithinRange(trafficData.speed(i, j), maxSpeedChange, 0, speedBounds.maxSpeed(ix, jx));
-            trafficData.flow(i, j) = adjustWithinRange(trafficData.flow(i, j), maxFlowChange, 0, 500);
-            trafficData.density(i, j) = adjustWithinRange(trafficData.density(i, j), maxDensityChange, 0, 100);
+            trafficData.speed(ix, jx) = adjustWithinRange(trafficData.speed(ix, jx), maxSpeedChange, 0, speedBounds.maxSpeed(ix, jx));
+            trafficData.flow(ix, jx) = adjustWithinRange(trafficData.flow(ix, jx), maxFlowChange, 0, 2600);
+            trafficData.density(ix, jx) = adjustWithinRange(trafficData.density(ix, jx), maxDensityChange, 0, 40);
         end
     end
 
