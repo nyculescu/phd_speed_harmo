@@ -1,5 +1,5 @@
 function [optimalSpeedLimits] = getOptimalSpeedLimits(mainLoopCycle, ...
-    numSegments, numLanes, RsuData, speedBounds)
+    numSegments, numLanes, RsuData, speedBounds, segmentLength)
     % This function calculates the optimal speed limits for road segments
     % to minimize traffic flow, considering various constraints.
 
@@ -7,58 +7,68 @@ function [optimalSpeedLimits] = getOptimalSpeedLimits(mainLoopCycle, ...
     opts = optimoptions('fmincon', 'Algorithm', 'sqp');
 
     % Define the objective function
-    objectiveFunction = @(x) calculateTotalFlow(numSegments, numLanes, RsuData);
+    objectiveFunction = @(x) calculateTotalFlow(numSegments, numLanes, RsuData, speedBounds);
+
+    % Calculate initialGuess based on adjusted speeds
+    initialGuess = zeros(numSegments, numLanes);
+    for i = 1:numSegments
+        for j = 1:numLanes
+            baseSpeed = speedBounds.maxSpeed(i, j); % Base speed for calculation
+            initialGuess(i, j) = adjustSpeedForConditions(RsuData, i, baseSpeed);
+        end
+    end
 
     % Define the nonlinear constraints
     nonlcon = @(x) systemConstraints(numSegments, numLanes, RsuData, speedBounds);
 
     % Solve Optimization Problem
     % maxSpeed is fed as initial guess and also as highest bounds
-    [optimalSpeedLimits, ~] = fmincon(objectiveFunction, speedBounds.maxSpeed, ...
+    [optimalSpeedLimits, ~] = fmincon(objectiveFunction, initialGuess, ...
         [], [], [], [], speedBounds.minSpeed, speedBounds.maxSpeed, nonlcon, opts);
 end
 
 %% Total Flow
-function totalFlow = calculateTotalFlow(numSegments, numLanes, RsuData)
+function totalFlow = calculateTotalFlow(numSegments, numLanes, RsuData, speedBounds)
     % This function calculates the total flow based on the given speed limits,
     % traffic, environmental, and road surface conditions.
 
     % Initialize total flow
     totalFlow = 0;
 
-    % Constants and Parameters
-    jamDensity = 200;    % vehicles per km, theoretical maximum density
-    segmentLength = 10;  % km, as per the requirement
-
     % Iterate over all segments and lanes to calculate the flow
     for i = numSegments
         for j = numLanes
-            % Extract data for the current segment and lane
-            vehicleCount = RsuData.traffic.flow(i, j); % Use volume for vehicle count
-            % environmentalFactors = [RsuData.environmental.temperature(i), ...
-            %     RsuData.environmental.windSpeed(i), RsuData.environmental.humidity(i), ...
-            %     RsuData.environmental.precipitation(i), RsuData.environmental.visibility(i)];
-            % roadSurfaceFactors = [RsuData.roadSurface.surfaceTemperature(i), ...
-            %     RsuData.roadSurface.moisture(i), RsuData.roadSurface.icing(i), ...
-            %     RsuData.roadSurface.salinity(i)];
-
-            % Calculate density for the current segment and lane
-            density = vehicleCount / segmentLength; % vehicles per km
-
-            % Calculate flow using a simplified model
-            if density < jamDensity
-                flow = density * RsuData.traffic.speed(i, j);
-            else
-                flow = 0; % At jam density, flow is zero
-            end
-
-            % Add the flow of the current segment and lane to the total flow
+            baseSpeed = speedBounds.maxSpeed(i, j); % Assume max speed as base
+            adjustedSpeed = adjustSpeedForConditions(RsuData, i, baseSpeed);
+            density = RsuData.traffic.density(i, j); 
+            
+            % Flow calculation using adjusted speed
+            flow = density * adjustedSpeed;
             totalFlow = totalFlow + flow;
         end
     end
     
-    disp('Total flow');
-    disp(totalFlow);
+    % disp('Total flow');
+    % disp(totalFlow);
+end
+
+function adjustedSpeed = adjustSpeedForConditions(RsuData, segment, maxSpeed)
+    rainThreshold = 25;
+    baseSpeed = maxSpeed;
+    iceThreshold = 0.5;
+    rainSpeedReductionFactor = 0.75;
+    iceSpeedReductionFactor = 0.75;
+    % Example: Adjust speed based on rainfall
+    if RsuData.environmental.precipitation(segment, 1) > rainThreshold
+        baseSpeed = baseSpeed * rainSpeedReductionFactor;
+    end
+
+    % Example: Adjust speed based on road icing
+    if RsuData.roadSurface.icing(segment,1) > iceThreshold
+        baseSpeed = baseSpeed * iceSpeedReductionFactor;
+    end
+
+    adjustedSpeed = baseSpeed;
 end
 
 % function adjustedSpeed = adjustSpeedForConditions(currentSpeed, environmentalFactors, roadSurfaceFactors)

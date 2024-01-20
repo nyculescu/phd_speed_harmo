@@ -4,26 +4,13 @@ function [trafficData, environmentalData, roadSurfaceData, speedBounds] = initTr
 
     % Speed limit bounds
     speedBounds = struct();
-    speedBounds.maxSpeed = 130 * ones(numSegments, numLanes); % Maximum speed in km/h %FIXME: for now, all lanes have 130 as max pseed limit
+    speedBounds.maxSpeed = 130 * ones(numSegments, numLanes); % Maximum speed in km/h %FIXME: for now, all lanes have 130 as max pseed limit. To be included into RsuData.speed
     speedBounds.minSpeed = 5 * ones(numSegments, numLanes);
-
-    % Initialize data structures
-    trafficData = struct('speed', zeros(numSegments, numLanes), ...
-                         'flow', zeros(numSegments, numLanes), ...
-                         'density', zeros(numSegments, numLanes));
-    environmentalData = struct('temperature', zeros(numSegments, 1), ...
-                               'windSpeed', zeros(numSegments, 1), ...
-                               'humidity', zeros(numSegments, 1), ...
-                               'precipitation', zeros(numSegments, 1), ...
-                               'visibility', zeros(numSegments, 1));
-    roadSurfaceData = struct('surfaceTemperature', zeros(numSegments, 1), ...
-                             'moisture', zeros(numSegments, 1), ...
-                             'icing', zeros(numSegments, 1), ...
-                             'salinity', zeros(numSegments, 1));
         
-    [environmentalData, roadSurfaceData] = initEnvironmentAndSurface(numSegments, environmentalData, roadSurfaceData);
+    [environmentalData, roadSurfaceData] = initEnvironmentAndSurface(numSegments);
     
-    trafficData = initTrafficFlow(numSegments, numLanes, trafficData, speedBounds);
+    trafficData = initTrafficFlow(numSegments, numLanes, speedBounds, ...
+        environmentalData.precipitation, roadSurfaceData.icing);
 end
 
 function newValue = adjustWithinRange(value, maxChange, minLimit, maxLimit)
@@ -35,96 +22,84 @@ function newValue = adjustWithinRange(value, maxChange, minLimit, maxLimit)
 end
 
 %% Generate Environmental and Road Surface mock data for each segment
-function [environmentalData, roadSurfaceData] = initEnvironmentAndSurface(numSegments, environmentalData, roadSurfaceData)
-    % Environmental Data
-    minTemperature = -40;       % Minimum temperature in Celsius
-    maxTemperature = 45;        % Maximum temperature in Celsius
-    maxWindSpeed = 75;          % Maximum wind speed in km/h
-    maxHumidity = 100;          % Maximum humidity percentage
-    maxPrecipitation = 100;     % Maximum precipitation in mm/h
-    maxVisibility = 10;         % Maximum visibility in km
-    baseTemperature = minTemperature + (maxTemperature - minTemperature) * rand;
-    baseWindSpeed = maxWindSpeed * rand;
-    baseHumidity = maxHumidity * rand;
-    basePrecipitation = maxPrecipitation * rand;
+function [environmentalData, roadSurfaceData] = initEnvironmentAndSurface(numSegments)
+    % Initialize structures
+    environmentalData = struct('temperature', zeros(numSegments, 1), ...
+                               'windSpeed', zeros(numSegments, 1), ...
+                               'humidity', zeros(numSegments, 1), ...
+                               'precipitation', zeros(numSegments, 1), ...
+                               'visibility', zeros(numSegments, 1));
+    roadSurfaceData = struct('surfaceTemperature', zeros(numSegments, 1), ...
+                             'moisture', zeros(numSegments, 1), ...
+                             'icing', zeros(numSegments, 1), ...
+                             'salinity', zeros(numSegments, 1));
 
-    % Road Surface Data
-    minSurfaceTemp = -30;       % Minimum surface temperature in Celsius
-    maxSurfaceTemp = 60;        % Maximum surface temperature in Celsius
-    maxMoistureLevel = 100;     % Maximum moisture level percentage
-    maxIcing = 100;             % Maximum icing percentage
-    maxSalinity = 25;           % Maximum salinity percentage
-    baseMoisture = 0;
-    baseIcing = 0;
-    
-    if basePrecipitation < 10
-        if baseTemperature > 40
-            baseSurfaceTemperature = baseTemperature + 10;
-            baseVisibility = 100;
-        elseif baseTemperature > 35
-            baseSurfaceTemperature = baseTemperature + 8.5;
-            baseVisibility = 100;
-        elseif baseTemperature > 30
-            baseSurfaceTemperature = baseTemperature + 6;
-            baseVisibility = 100;
-        elseif baseTemperature > 25
-            baseSurfaceTemperature = baseTemperature + 4.5;
-            baseVisibility = 75 + (100-75).*rand(1,1);
-        elseif baseTemperature > 20
-            baseSurfaceTemperature = baseTemperature + 3;
-            baseVisibility = 50 + (100-50).*rand(1,1);
-        elseif baseTemperature > 10
-            baseSurfaceTemperature = baseTemperature + 1.5;
-            baseVisibility = 35 + (100-35).*rand(1,1);
-            baseMoisture = 5;
-        else
-            baseSurfaceTemperature = baseTemperature;
-            baseMoisture = 10;
-            baseVisibility = 25 + (100-25).*rand(1,1);
-            baseIcing = 10 * basePrecipitation * 1 / baseSurfaceTemperature;
-        end
-    else
-        baseMoisture = 10 + (100-10).*rand(1,1);
-        baseSurfaceTemperature = baseTemperature;
-        baseVisibility = 25 + (100-25).*rand(1,1);
-        baseIcing = abs(10 * basePrecipitation * 1 / baseSurfaceTemperature);
-    end
+    baseTemperature = randi([-20, 50]); % Temperature in Celsius;
+    baseWindSpeed = randi([0, 100]); % Wind speed in km/h
+    basePrecipitation = randi([0, 20]); % Precipitation in mm/h
+    baseHumidity = deriveHumidity(baseTemperature, basePrecipitation);
+    baseVisibility = deriveVisibility(baseWindSpeed, basePrecipitation);
 
-    baseSalinity = maxSalinity * rand;
-    if basePrecipitation > 10 % Threshold for heavy rain
-        baseSalinity = baseSalinity * 0.8; % Reduce salinity by 20%
-    end
-
-    if baseWindSpeed > 50 % Threshold for high wind
-        baseVisibility = baseVisibility * 0.01 * baseWindSpeed; % Reduce visibility
-    end
-
-    if baseSurfaceTemperature < 0
-        baseIcing = baseIcing * 1.25; % Increase icing by 25%
-    end
-    
-    if baseSalinity > 5
-        baseIcing = baseIcing * 0.75; % Reduce icing by 25%
-    end
-
+    baseSurfaceTemperature = adjustSurfaceTemp(baseTemperature, -20, 55);
+    baseMoisture = adjustMoisture(basePrecipitation, 100);
+    baseIcing = adjustIcing(baseSurfaceTemperature, 100);
+    baseSalinity = adjustSalinity(basePrecipitation, 30);
     for i = 1:numSegments
-        % Environmental Data
-        environmentalData.temperature(i) = adjustWithinRange(baseTemperature, 0.25, minTemperature, maxTemperature);
-        environmentalData.windSpeed(i) = adjustWithinRange(baseWindSpeed, 2, 0, maxWindSpeed);
-        environmentalData.humidity(i) = adjustWithinRange(baseHumidity, 2, 0, maxHumidity);
-        environmentalData.precipitation(i) = adjustWithinRange(basePrecipitation, 3, 0, maxPrecipitation);
-        environmentalData.visibility(i) = adjustWithinRange(baseVisibility, 1, 0, maxVisibility); % FIXME: 0 means no visibility, so 0 is a maximum
-
+        environmentalData.temperature(i) = adjustWithinRange(baseTemperature, 1, -20, 50);
+        environmentalData.windSpeed(i) = adjustWithinRange(baseWindSpeed, 2.5, 0, 100);
+        environmentalData.precipitation(i) = adjustWithinRange(basePrecipitation, 3, 0, 100);
+        environmentalData.humidity(i) = adjustWithinRange(baseHumidity, 2.5, 0, 100);
+        environmentalData.visibility(i) = adjustWithinRange(baseVisibility, 2.5, 0, 100);
+    
         % Road Surface Data
-        roadSurfaceData.surfaceTemperature(i) = adjustWithinRange(baseSurfaceTemperature, 1, minSurfaceTemp, maxSurfaceTemp);
-        roadSurfaceData.moisture(i) = adjustWithinRange(baseMoisture, 2, 0, maxMoistureLevel);
-        roadSurfaceData.icing(i) = adjustWithinRange(baseIcing, 2.5, 0, maxIcing);
-        roadSurfaceData.salinity(i) = adjustWithinRange(baseSalinity, 1, 0, maxSalinity);
+        roadSurfaceData.surfaceTemperature(i) = adjustWithinRange(baseSurfaceTemperature, 1, -20, 55);
+        roadSurfaceData.moisture(i) = adjustWithinRange(baseMoisture, 2.5, 0, 100);
+        roadSurfaceData.icing(i) = adjustWithinRange(baseIcing, 2.5, 0, 100);
+        roadSurfaceData.salinity(i) = adjustWithinRange(baseSalinity, 2.5, 0, 30);
     end
+
+    % Assume roadSurfaceData is derived similarly or provided separately
+end
+
+function humidity = deriveHumidity(temperature, precipitation)
+    % Example logic: Higher precipitation increases humidity
+    humidity = min(100, max(0, 60 + precipitation - temperature / 2));
+end
+
+function visibility = deriveVisibility(windSpeed, precipitation)
+    % Example logic: Higher wind speed or precipitation reduces visibility
+    visibility = max(0.2, 10 - precipitation / 2 - windSpeed / 10);
+end
+
+function surfaceTemp = adjustSurfaceTemp(temperature, minSurfaceTemp, maxSurfaceTemp)
+    % Adjust surface temperature
+    surfaceTemp = temperature + (rand * 5 - 2.5); % Example adjustment
+    surfaceTemp = max(min(surfaceTemp, maxSurfaceTemp), minSurfaceTemp);
+end
+
+function moisture = adjustMoisture(precipitation, maxMoisture)
+    % Adjust moisture level
+    moisture = precipitation * 5; % Example adjustment
+    moisture = min(moisture, maxMoisture);
+end
+
+function icing = adjustIcing(surfaceTemp, maxIcing)
+    % Adjust icing level
+    icing = maxIcing * (0 - min(surfaceTemp, 0)) / 10; % Example adjustment
+    icing = max(icing, 0);
+end
+
+function salinity = adjustSalinity(precipitation, maxSalinity)
+    % Adjust salinity level
+    salinity = maxSalinity * (1 - precipitation / 20); % Example adjustment
+    salinity = max(salinity, 0);
 end
 
 %% Generate Traffic Flow mock data for each segment
-function trafficData = initTrafficFlow(numSegments, numLanes, trafficData, speedBounds)
+function trafficData = initTrafficFlow(numSegments, numLanes, speedBounds, precipitation, icing)
+    trafficData = struct('speed', zeros(numSegments, numLanes), ...
+                         'flow', zeros(numSegments, numLanes), ...
+                         'density', zeros(numSegments, numLanes));
     for i = 1:numSegments
         ix = uint32(i);
 
@@ -132,11 +107,11 @@ function trafficData = initTrafficFlow(numSegments, numLanes, trafficData, speed
         % definitionally as flow = density x space mean speed
     
         % Assuming a normal distribution centered around half the maxDensity
-        maxDensity = 40; % Maximum occupancy [vehicles/km/lane]
+        maxDensity = 40; % Maximum density [vehicles/km/lane] % FIXME: to be included into RsuData.density
         baseDensity = getDensity(maxDensity);
 
         % Speed Calculation considering different traffic conditions
-        baseSpeed = getSpeedBasedOnDensity(maxDensity, baseDensity, speedBounds, ix);
+        baseSpeed = getSpeedBasedOnDensity(maxDensity, baseDensity, speedBounds, ix, precipitation, icing);
 
         % Flow Calculation with variability
         % maxFlow = 40; % Not required
@@ -170,16 +145,49 @@ function baseDensity = getDensity(maxDensity)
     baseDensity = min(baseDensity, maxDensity); % Ensuring density is within realistic bounds
 end
 
-function baseSpeed = getSpeedBasedOnDensity(maxDensity, baseDensity, speedBounds, segment) 
+% Greenshields' linear model is a basic but commonly used approach in traffic flow theory. 
+% This model suggests a linear relationship between speed and density, 
+% with the speed decreasing as density increases. speed = maxSpeed * (1 - baseDensity / jamDensity)
+function baseSpeed = getSpeedBasedOnDensity(maxDensity, baseDensity, speedBounds, segment, precipitation, icing) 
     jamDensity = maxDensity; % Density at which traffic is jammed
     % Calculate speed using Greenshields' linear model
     baseSpeed = speedBounds.maxSpeed(segment, 1) * (1 - baseDensity / jamDensity);
+    
     % Introduce variability in speed
-    speedVariability = randn() * 5; % Adding variability with a standard deviation of 5 km/h
-    baseSpeed = baseSpeed + speedVariability;
+    % speedVariability = randn() * 5; % Adding variability with a standard deviation of 5 km/h
+    % baseSpeed = baseSpeed + speedVariability;
+    
+    % Adjust speed for environmental and road surface conditions
+    baseSpeed = adjustSpeedForConditions(baseSpeed, precipitation, icing);
+    
     % Ensure the speed is not negative or exceeding maxSpeed
     baseSpeed = max(min(baseSpeed, speedBounds.maxSpeed(segment, 1)), 0);
 end
+
+function adjustedSpeed = adjustSpeedForConditions(baseSpeed, precipitation, icing)
+    % Define reduction factors and thresholds
+    rainSpeedReductionFactor = 0.8; % Speed reduction in heavy rain
+    iceSpeedReductionFactor = 0.7; % Speed reduction on icy roads
+    rainThreshold = 10; % mm/h, threshold for heavy rain
+    iceThreshold = 0.5; % threshold for significant icing
+
+    % Adjust speed based on rainfall
+    if precipitation > rainThreshold
+        baseSpeed = baseSpeed * rainSpeedReductionFactor;
+    end
+
+    % Adjust speed based on road icing
+    if icing > iceThreshold
+        baseSpeed = baseSpeed * iceSpeedReductionFactor;
+    end
+
+    % Additional adjustments can be added here based on other environmental or road surface factors
+
+    % Ensure the adjusted speed is not lower than a minimum threshold
+    minSpeedLimit = 30; % Define a reasonable minimum speed limit
+    adjustedSpeed = max(baseSpeed, minSpeedLimit);
+end
+
 
 % Obsolete: adjusting the logistic model parameters doesn't yield satisfactory results
 function baseSpeed = getSpeedBasedOnDensity_old(maxDensity, baseDensity, speedBounds) 

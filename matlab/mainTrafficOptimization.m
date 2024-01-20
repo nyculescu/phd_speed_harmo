@@ -2,7 +2,8 @@ function mainTrafficOptimization()
     addpath './system_monitoring'
     addpath './input_data'
 
-    [numSegments, numLanes] = deal(4, 3); % Example values
+    [numSegments, numLanes] = deal(4, 3); % Example values % FIXME: for now, only 4 segments by 3 lanes are generated
+    segmentLength = 10;  % km, as per the requirement
 
     localData = struct(); % Data stored and/or data predicted by ML-based sub-system
     % The local data is used to fusion (or augment) with or replace the sensor data
@@ -28,7 +29,7 @@ function mainTrafficOptimization()
         runSystemConditionObserver(numSegments, numLanes, RsuData, 10, 10);
 
         % Call the optimization routine
-        v_lim_opt = getOptimalSpeedLimits(mainLoopCycle, numSegments, numLanes, RsuData, speedBounds);
+        v_lim_opt = getOptimalSpeedLimits(mainLoopCycle, numSegments, numLanes, RsuData, speedBounds, segmentLength);
         
         % Plot the optimized speed limits for each lane
         displayGridRhoValue(v_lim_opt, numSegments, numLanes, mainLoopCycle);
