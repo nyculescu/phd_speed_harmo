@@ -6,7 +6,7 @@ function [RsuData] = getTrafficData_Mock(numSegments, numLanes, ...
     % Define maximum change per cycle
     maxSpeedChange = 1; % km/h
     maxFlowChange = 2; % vehicles
-    maxOccupancyChange = 1; % percentage points
+    maxDensityChange = 1; % percentage points
 
     maxTempChange = 1; % degrees Celsius
     maxWindChange = 1; % km/h
@@ -25,7 +25,7 @@ function [RsuData] = getTrafficData_Mock(numSegments, numLanes, ...
             ix = uint32(i); jx = uint32(j);
             trafficData.speed(i, j) = adjustWithinRange(trafficData.speed(i, j), maxSpeedChange, 0, speedBounds.maxSpeed(ix, jx));
             trafficData.flow(i, j) = adjustWithinRange(trafficData.flow(i, j), maxFlowChange, 0, 500);
-            trafficData.occupancy(i, j) = adjustWithinRange(trafficData.occupancy(i, j), maxOccupancyChange, 0, 100);
+            trafficData.density(i, j) = adjustWithinRange(trafficData.density(i, j), maxDensityChange, 0, 100);
         end
     end
 

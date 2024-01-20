@@ -34,24 +34,20 @@ function totalFlow = calculateTotalFlow(numSegments, numLanes, RsuData)
     for i = numSegments
         for j = numLanes
             % Extract data for the current segment and lane
-            currentSpeed = RsuData.traffic.speed(i, j);
-            vehicleCount = RsuData.traffic.volume(i, j); % Use volume for vehicle count
-            environmentalFactors = [RsuData.environmental.temperature(i), ...
-                RsuData.environmental.windSpeed(i), RsuData.environmental.humidity(i), ...
-                RsuData.environmental.precipitation(i), RsuData.environmental.visibility(i)];
-            roadSurfaceFactors = [RsuData.roadSurface.surfaceTemperature(i), ...
-                RsuData.roadSurface.moisture(i), RsuData.roadSurface.icing(i), ...
-                RsuData.roadSurface.salinity(i)];
-
-            % Adjust speed based on environmental and road surface conditions
-            adjustedSpeed = adjustSpeedForConditions(currentSpeed, environmentalFactors, roadSurfaceFactors);
+            vehicleCount = RsuData.traffic.flow(i, j); % Use volume for vehicle count
+            % environmentalFactors = [RsuData.environmental.temperature(i), ...
+            %     RsuData.environmental.windSpeed(i), RsuData.environmental.humidity(i), ...
+            %     RsuData.environmental.precipitation(i), RsuData.environmental.visibility(i)];
+            % roadSurfaceFactors = [RsuData.roadSurface.surfaceTemperature(i), ...
+            %     RsuData.roadSurface.moisture(i), RsuData.roadSurface.icing(i), ...
+            %     RsuData.roadSurface.salinity(i)];
 
             % Calculate density for the current segment and lane
             density = vehicleCount / segmentLength; % vehicles per km
 
             % Calculate flow using a simplified model
             if density < jamDensity
-                flow = density * adjustedSpeed;
+                flow = density * RsuData.traffic.speed(i, j);
             else
                 flow = 0; % At jam density, flow is zero
             end
@@ -65,23 +61,23 @@ function totalFlow = calculateTotalFlow(numSegments, numLanes, RsuData)
     disp(totalFlow);
 end
 
-function adjustedSpeed = adjustSpeedForConditions(currentSpeed, environmentalFactors, roadSurfaceFactors)
-    % Adjust the speed based on environmental and road surface conditions
-    % Implement a realistic model based on environmental and road surface factors.
-
-    % Placeholder for environmental and road surface adjustments
-    % Adjust this logic based on your specific model or empirical data
-    % Example: Decrease speed for adverse conditions
-    if environmentalFactors(4) > 70 % Heavy rainfall
-        currentSpeed = currentSpeed * 0.8;
-    end
-    if roadSurfaceFactors(3) > 25 % High icing
-        currentSpeed = currentSpeed * 0.7;
-    end
-
-    % Calculate adjusted speed
-    adjustedSpeed = currentSpeed; % This is a simplified placeholder
-end
+% function adjustedSpeed = adjustSpeedForConditions(currentSpeed, environmentalFactors, roadSurfaceFactors)
+%     % Adjust the speed based on environmental and road surface conditions
+%     % Implement a realistic model based on environmental and road surface factors.
+% 
+%     % Placeholder for environmental and road surface adjustments
+%     % Adjust this logic based on your specific model or empirical data
+%     % Example: Decrease speed for adverse conditions
+%     if environmentalFactors(4) > 70 % Heavy rainfall
+%         currentSpeed = currentSpeed * 0.8;
+%     end
+%     if roadSurfaceFactors(3) > 25 % High icing
+%         currentSpeed = currentSpeed * 0.7;
+%     end
+% 
+%     % Calculate adjusted speed
+%     adjustedSpeed = currentSpeed; % This is a simplified placeholder
+% end
 
 
 %% System Constraints
@@ -95,7 +91,7 @@ function [c, ceq] = systemConstraints(numSegments, numLanes, ...
     c = [];
     ceq = [];
 
-    % Constraint 1: Speed limits - Ensure speed is within legal limits
+    % Constraint: Speed limits - Ensure speed is within legal limits
     for i = 1:numSegments
         for j = 1:numLanes
             ix = uint32(i); jx = uint32(j);
@@ -104,47 +100,47 @@ function [c, ceq] = systemConstraints(numSegments, numLanes, ...
         end
     end
 
-    % Constraint 2: Environmental constraints
-    for i = 1:numSegments
-        ix = uint32(i);
-        if RsuData.environmental.precipitation(ix) > 50 % Arbitrary threshold for heavy rainfall
-            for j = 1:numLanes
-                jx = uint32(j);
-                c(end+1) = RsuData.traffic.speed(ix,jx) - 80; % Speed should be less than 80 km/h under heavy rain
-            end
-        end
-    end
+    % % Constraint: Environmental constraints
+    % for i = 1:numSegments
+    %     ix = uint32(i);
+    %     if RsuData.environmental.precipitation(ix) > 50 % Arbitrary threshold for heavy rainfall
+    %         for j = 1:numLanes
+    %             jx = uint32(j);
+    %             c(end+1) = speedBounds.maxSpeed(ix,jx) - 80; % Speed should be less than 80 km/h under heavy rain
+    %         end
+    %     end
+    % end
 
-    % Constraint 3: Road surface constraints
+    % Constraint: Road surface constraints
     for i = 1:numSegments
         ix = uint32(i);
         % Example: Adjust speed in segments with poor road conditions
         if RsuData.roadSurface.moisture(ix) > 50 || RsuData.roadSurface.icing(ix) > 50 % High moisture or icing
             for j = 1:numLanes
                 jx = uint32(j);
-                c(end+1) = RsuData.traffic.speed(ix,jx) - 70; % Speed should be less than 70 km/h in these conditions
+                c(end+1) = speedBounds.maxSpeed(ix,jx) - 70; % Speed should be less than 70 km/h in these conditions
             end
         end
     end
 
-    % Constraint 4: Traffic constraints
+    % Constraint: Traffic constraints
     for i = 1:numSegments
         for j = 1:numLanes
             ix = uint32(i); jx = uint32(j);
             % Adjust speed based on vehicle count
-            if RsuData.traffic.volume(ix, jx) > 100 % Arbitrary threshold for heavy traffic
-                c(end+1) = RsuData.traffic.speed(ix,jx) - 60; % Speed should be less than 60 km/h in heavy traffic
+            if RsuData.traffic.flow(ix, jx) > 100 % Arbitrary threshold for heavy traffic
+                c(end+1) = speedBounds.maxSpeed(ix,jx) - 60; % Speed should be less than 60 km/h in heavy traffic
             end
         end
     end
 
-    % Constraint 5: Adjusting speed constraint for rainfall
+    % Constraint: Adjusting speed constraint for rainfall
     for i = 1:numSegments
         ix = uint32(ix); 
         rainIntensity = RsuData.environmental.precipitation(ix);
-        rainSpeedReduction = max(30, 120 - rainIntensity); % Reduce speed limit as rain intensity increases
         for j = 1:numLanes
             jx = uint32(j);
+            rainSpeedReduction = max(30, speedBounds.maxSpeed(ix,jx) - rainIntensity); % Reduce speed limit as rain intensity increases
             c(end+1) = RsuData.traffic.speed(ix,jx) - rainSpeedReduction;
         end
     end

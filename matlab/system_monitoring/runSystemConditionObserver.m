@@ -6,9 +6,9 @@ function runSystemConditionObserver(numSegments, numLanes, RsuData, densityRange
     healthReport = struct();
     
     % Update sensor data
-    RsuData.trafficData.volume = randi(densityRange, numSegments, numLanes);
+    RsuData.trafficData.flow = randi(densityRange, numSegments, numLanes);
     RsuData.trafficData.speed = randi(speedRange, numSegments, numLanes);
-    RsuData.trafficData.occupancy = rand(numSegments, 1) * 10;
+    RsuData.trafficData.density = rand(numSegments, 1) * 10;
    
     % Update sensor status (simulating changes over time)
     for i = 1:numSegments
