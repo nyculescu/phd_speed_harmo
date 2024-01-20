@@ -7,8 +7,7 @@ function [optimalSpeedLimits] = getOptimalSpeedLimits(mainLoopCycle, ...
     opts = optimoptions('fmincon', 'Algorithm', 'sqp');
 
     % Define the objective function
-    objectiveFunction = @(x) calculateTotalFlow(numSegments, numLanes, RsuData.traffic, ...
-        RsuData.environmental, RsuData.roadSurface);
+    objectiveFunction = @(x) calculateTotalFlow(numSegments, numLanes, RsuData);
 
     % Define the nonlinear constraints
     nonlcon = @(x) systemConstraints(numSegments, numLanes, RsuData, speedBounds);
@@ -20,8 +19,7 @@ function [optimalSpeedLimits] = getOptimalSpeedLimits(mainLoopCycle, ...
 end
 
 %% Total Flow
-function totalFlow = calculateTotalFlow(numSegments, numLanes, trafficData, environmentalData, ...
-    roadSurfaceData)
+function totalFlow = calculateTotalFlow(numSegments, numLanes, RsuData)
     % This function calculates the total flow based on the given speed limits,
     % traffic, environmental, and road surface conditions.
 
@@ -36,14 +34,14 @@ function totalFlow = calculateTotalFlow(numSegments, numLanes, trafficData, envi
     for i = numSegments
         for j = numLanes
             % Extract data for the current segment and lane
-            currentSpeed = trafficData.speed(i, j);
-            vehicleCount = trafficData.volume(i, j); % Use volume for vehicle count
-            environmentalFactors = [environmentalData.temperature(i), ...
-                environmentalData.windSpeed(i), environmentalData.humidity(i), ...
-                environmentalData.precipitation(i), environmentalData.visibility(i)];
-            roadSurfaceFactors = [roadSurfaceData.surfaceTemperature(i), ...
-                roadSurfaceData.moisture(i), roadSurfaceData.icing(i), ...
-                roadSurfaceData.salinity(i)];
+            currentSpeed = RsuData.traffic.speed(i, j);
+            vehicleCount = RsuData.traffic.volume(i, j); % Use volume for vehicle count
+            environmentalFactors = [RsuData.environmental.temperature(i), ...
+                RsuData.environmental.windSpeed(i), RsuData.environmental.humidity(i), ...
+                RsuData.environmental.precipitation(i), RsuData.environmental.visibility(i)];
+            roadSurfaceFactors = [RsuData.roadSurface.surfaceTemperature(i), ...
+                RsuData.roadSurface.moisture(i), RsuData.roadSurface.icing(i), ...
+                RsuData.roadSurface.salinity(i)];
 
             % Adjust speed based on environmental and road surface conditions
             adjustedSpeed = adjustSpeedForConditions(currentSpeed, environmentalFactors, roadSurfaceFactors);
