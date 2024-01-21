@@ -35,25 +35,25 @@ function [environmentalData, roadSurfaceData] = initEnvironmentAndSurface(numSeg
                              'salinity', zeros(numSegments, 1));
 
     baseTemperature = randi([-20, 50]); % Temperature in Celsius;
-    baseWindSpeed = randi([0, 100]); % Wind speed in km/h
-    basePrecipitation = randi([0, 20]); % Precipitation in mm/h
+    baseWindSpeed = randi([0, 110]); % Wind speed in km/h
+    basePrecipitation = max(0, min(50, abs(randn)*5 + 2.5)); % Precipitation in mm/h
     baseHumidity = deriveHumidity(baseTemperature, basePrecipitation);
     baseVisibility = deriveVisibility(baseWindSpeed, basePrecipitation);
 
     baseSurfaceTemperature = adjustSurfaceTemp(baseTemperature, -20, 55);
-    baseMoisture = adjustMoisture(basePrecipitation, 100);
+    baseMoisture = adjustMoisture(basePrecipitation, baseSurfaceTemperature);
     baseSalinity = adjustSalinity(basePrecipitation, 15); % [g/L]
-    baseIcing = adjustIcing(baseSurfaceTemperature, baseSalinity, 1); % [cm]
+    baseIcing = adjustIcing(baseSurfaceTemperature, baseSalinity, 2); % [cm]
 
     for i = 1:numSegments
         environmentalData.temperature(i) = adjustWithinRange(baseTemperature, 1, -20, 50);
         environmentalData.windSpeed(i) = adjustWithinRange(baseWindSpeed, 2.5, 0, 100);
-        environmentalData.precipitation(i) = adjustWithinRange(basePrecipitation, 3, 0, 100);
+        environmentalData.precipitation(i) = adjustWithinRange(basePrecipitation, 0.5, 0, 100);
         environmentalData.humidity(i) = adjustWithinRange(baseHumidity, 2.5, 0, 100);
         environmentalData.visibility(i) = adjustWithinRange(baseVisibility, 2.5, 0, 100);
     
         % Road Surface Data
-        roadSurfaceData.moisture(i) = adjustWithinRange(baseMoisture, 2.5, 0, 100);
+        roadSurfaceData.moisture(i) = adjustWithinRange(baseMoisture, 2.5, 0, 30);
         roadSurfaceData.surfaceTemperature(i) = adjustWithinRange(baseSurfaceTemperature, 1.0, -20, 55);
         if (roadSurfaceData.surfaceTemperature(i) < 0)
             roadSurfaceData.icing(i) = adjustWithinRange(baseIcing, 0.05, 0, 1);
@@ -82,10 +82,11 @@ function surfaceTemp = adjustSurfaceTemp(temperature, minSurfaceTemp, maxSurface
     surfaceTemp = max(min(surfaceTemp, maxSurfaceTemp), minSurfaceTemp);
 end
 
-function moisture = adjustMoisture(precipitation, maxMoisture)
+function moisture = adjustMoisture(precipitation, baseSurfaceTemperature)
     % Adjust moisture level
-    moisture = precipitation * 5; % Example adjustment
-    moisture = min(moisture, maxMoisture);
+    k1 = max(0, min(1, normrnd(0.75,3)));
+    k2 = max(0, min(1, normrnd(0.75,3)));
+    moisture = k1 * precipitation * (1 - exp(-k2*baseSurfaceTemperature));
 end
 
 function icing = adjustIcing(baseSurfaceTemp, baseSalinity, maxIcing)

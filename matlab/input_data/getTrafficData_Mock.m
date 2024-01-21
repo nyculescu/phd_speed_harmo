@@ -11,12 +11,12 @@ function [RsuData] = getTrafficData_Mock(numSegments, numLanes, ...
     maxTempChange = 1; % degrees Celsius
     maxWindChange = 1; % km/h
     maxHumidityChange = 1; % percentage points
-    maxPrecipitationChange = 2; % mm/h
+    maxPrecipitationChange = 2.5; % mm/h
     maxVisibilityChange = 1; % km
 
     maxSurfaceTempChange = 1; % degrees Celsius
-    maxMoistureChange = 2; % percentage points
-    maxIcingChange = 0.05; % cm
+    maxMoistureChange = 0.25; % percentage points
+    maxIcingChange = 0.1; % cm
     maxSalinityChange = 0.01; % g/L
 
     % Adjust traffic data
@@ -41,9 +41,39 @@ function [RsuData] = getTrafficData_Mock(numSegments, numLanes, ...
     % Adjust road surface data
     for i = 1:numSegments
         roadSurfaceData.surfaceTemperature(i) = adjustWithinRange(roadSurfaceData.surfaceTemperature(i), maxSurfaceTempChange, -30, 60);
-        roadSurfaceData.moisture(i) = adjustWithinRange(roadSurfaceData.moisture(i), maxMoistureChange, 0, 100);
+        
         if roadSurfaceData.surfaceTemperature(i) < 0
-            roadSurfaceData.icing(i) = adjustWithinRange(roadSurfaceData.icing(i), maxIcingChange, 0, 100);
+            roadSurfaceData.icing(i) = adjustWithinRange(roadSurfaceData.icing(i), maxIcingChange, 0, 2);
+        else
+            % FIXME: this formula is wrong, shall be replaced
+            k2 = max(0, min(5, normrnd(1,3))) * 0.001; 
+            moistureChange = exp(-k2 * (roadSurfaceData.surfaceTemperature(i) + environmentalData.windSpeed(i) * 0.01));
+            roadSurfaceData.moisture(i) = adjustWithinRange(roadSurfaceData.moisture(i), moistureChange, 0, 30); 
+            % FIXME: At >30 temps, the moisture is still present
+            
+            % TODO: simplified model approach that tries to capture some real-world dynamics
+            % Factors:
+            % - Rainfall rate (R)
+            % - Temperature (T)
+            % - Road porosity (Pr)
+            % - Drainage rate (Dr)
+            % 
+            % Equations:
+            % Moisture Gain Rate = k1 * R * (1 - e^(-k2*T))
+            % Moisture Loss Rate = Dr * Current_Moisture
+            % 
+            % Calculation:
+            % - Calculate moisture gain rate based on rainfall, temp
+            % - Reduce gain if temp is low
+            % - Calculate moisture loss rate via drainage
+            % - Integrate moisture over time based on gain - loss
+            % 
+            % Extend model to include:
+            % - Evaporation effects
+            % - Surface runoff direction
+            % - Groundwater table effects
+            % - Frozen ground inhibition of drainage
+            % - Spatial variability based on road materials
         end
         roadSurfaceData.salinity(i) = adjustWithinRange(roadSurfaceData.salinity(i), maxSalinityChange, 0, 100);
     end
