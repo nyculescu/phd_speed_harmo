@@ -16,8 +16,8 @@ function [RsuData] = getTrafficData_Mock(numSegments, numLanes, ...
 
     maxSurfaceTempChange = 1; % degrees Celsius
     maxMoistureChange = 2; % percentage points
-    maxIcingChange = 1; % percentage points
-    maxSalinityChange = 1; % percentage points
+    maxIcingChange = 0.05; % cm
+    maxSalinityChange = 0.01; % g/L
 
     % Adjust traffic data
     for i = 1:numSegments
@@ -42,7 +42,9 @@ function [RsuData] = getTrafficData_Mock(numSegments, numLanes, ...
     for i = 1:numSegments
         roadSurfaceData.surfaceTemperature(i) = adjustWithinRange(roadSurfaceData.surfaceTemperature(i), maxSurfaceTempChange, -30, 60);
         roadSurfaceData.moisture(i) = adjustWithinRange(roadSurfaceData.moisture(i), maxMoistureChange, 0, 100);
-        roadSurfaceData.icing(i) = adjustWithinRange(roadSurfaceData.icing(i), maxIcingChange, 0, 100);
+        if roadSurfaceData.surfaceTemperature(i) < 0
+            roadSurfaceData.icing(i) = adjustWithinRange(roadSurfaceData.icing(i), maxIcingChange, 0, 100);
+        end
         roadSurfaceData.salinity(i) = adjustWithinRange(roadSurfaceData.salinity(i), maxSalinityChange, 0, 100);
     end
 

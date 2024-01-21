@@ -42,8 +42,9 @@ function [environmentalData, roadSurfaceData] = initEnvironmentAndSurface(numSeg
 
     baseSurfaceTemperature = adjustSurfaceTemp(baseTemperature, -20, 55);
     baseMoisture = adjustMoisture(basePrecipitation, 100);
-    baseIcing = adjustIcing(baseSurfaceTemperature, 100);
-    baseSalinity = adjustSalinity(basePrecipitation, 30);
+    baseSalinity = adjustSalinity(basePrecipitation, 15); % [g/L]
+    baseIcing = adjustIcing(baseSurfaceTemperature, baseSalinity, 1); % [cm]
+
     for i = 1:numSegments
         environmentalData.temperature(i) = adjustWithinRange(baseTemperature, 1, -20, 50);
         environmentalData.windSpeed(i) = adjustWithinRange(baseWindSpeed, 2.5, 0, 100);
@@ -52,9 +53,13 @@ function [environmentalData, roadSurfaceData] = initEnvironmentAndSurface(numSeg
         environmentalData.visibility(i) = adjustWithinRange(baseVisibility, 2.5, 0, 100);
     
         % Road Surface Data
-        roadSurfaceData.surfaceTemperature(i) = adjustWithinRange(baseSurfaceTemperature, 1, -20, 55);
         roadSurfaceData.moisture(i) = adjustWithinRange(baseMoisture, 2.5, 0, 100);
-        roadSurfaceData.icing(i) = adjustWithinRange(baseIcing, 2.5, 0, 100);
+        roadSurfaceData.surfaceTemperature(i) = adjustWithinRange(baseSurfaceTemperature, 1.0, -20, 55);
+        if (roadSurfaceData.surfaceTemperature(i) < 0)
+            roadSurfaceData.icing(i) = adjustWithinRange(baseIcing, 0.05, 0, 1);
+        else
+            roadSurfaceData.icing(i) = 0;
+        end
         roadSurfaceData.salinity(i) = adjustWithinRange(baseSalinity, 2.5, 0, 30);
     end
 
@@ -83,10 +88,20 @@ function moisture = adjustMoisture(precipitation, maxMoisture)
     moisture = min(moisture, maxMoisture);
 end
 
-function icing = adjustIcing(surfaceTemp, maxIcing)
-    % Adjust icing level
-    icing = maxIcing * (0 - min(surfaceTemp, 0)) / 10; % Example adjustment
-    icing = max(icing, 0);
+function icing = adjustIcing(baseSurfaceTemp, baseSalinity, maxIcing)
+    % Calculates freezing point based on water salinity 
+    freezingPoint0 = 0; % Freshwater freezing point 
+    slope = -0.05; % Example change
+    freezingPoint = freezingPoint0 + slope * baseSalinity; 
+    
+    if (baseSurfaceTemp < freezingPoint)
+        % Calculate icing rate 
+        deltaT = abs(freezingPoint - baseSurfaceTemp);
+        icingFactor = exp(-deltaT/3);  
+        icing = maxIcing * icingFactor;
+    else   
+        icing = 0;
+    end
 end
 
 function salinity = adjustSalinity(precipitation, maxSalinity)
@@ -169,7 +184,7 @@ function adjustedSpeed = adjustSpeedForConditions(baseSpeed, precipitation, icin
     rainSpeedReductionFactor = 0.8; % Speed reduction in heavy rain
     iceSpeedReductionFactor = 0.7; % Speed reduction on icy roads
     rainThreshold = 10; % mm/h, threshold for heavy rain
-    iceThreshold = 0.5; % threshold for significant icing
+    iceThreshold = 0.1; % threshold for significant icing
 
     % Adjust speed based on rainfall
     if precipitation > rainThreshold
