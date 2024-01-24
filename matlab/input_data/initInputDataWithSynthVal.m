@@ -1,15 +1,14 @@
-function [trafficData, environmentalData, roadSurfaceData, speedBounds] = initTrafficData_Mock(numSegments, numLanes)
+function [trafficData, environmentalData, roadSurfaceData, thresholds] = initInputDataWithSynthVal(numSegments, numLanes)
     % This function generates mock data for traffic, environmental, and road surface conditions
     % with variability between road segments.
-
-    % Speed limit bounds
-    speedBounds = struct();
-    speedBounds.maxSpeed = 130 * ones(numSegments, numLanes); % Maximum speed in km/h %FIXME: for now, all lanes have 130 as max pseed limit. To be included into RsuData.speed
-    speedBounds.minSpeed = 5 * ones(numSegments, numLanes);
-        
-    [environmentalData, roadSurfaceData] = initEnvironmentAndSurface(numSegments);
     
-    trafficData = initTrafficFlow(numSegments, numLanes, speedBounds, ...
+    thresholds.speed.max = 130 * ones(numSegments, numLanes); % Maximum speed in km/h %FIXME: for now, all lanes have 130 as max pseed limit. To be included into RsuData.speed;
+    thresholds.speed.min = 5 * ones(numSegments, numLanes);
+    thresholds.flow.max = 2600;
+
+    [environmentalData, roadSurfaceData] = initEnvironmentAndSurface(numSegments, thresholds);
+    
+    trafficData = initTrafficFlow(numSegments, numLanes, thresholds, ...
         environmentalData.precipitation, roadSurfaceData.icing);
 end
 
@@ -22,7 +21,7 @@ function newValue = adjustWithinRange(value, maxChange, minLimit, maxLimit)
 end
 
 %% Generate Environmental and Road Surface mock data for each segment
-function [environmentalData, roadSurfaceData] = initEnvironmentAndSurface(numSegments)
+function [environmentalData, roadSurfaceData] = initEnvironmentAndSurface(numSegments, thresholds)
     % Initialize structures
     environmentalData = struct('temperature', zeros(numSegments, 1), ...
                                'windSpeed', zeros(numSegments, 1), ...
@@ -33,12 +32,47 @@ function [environmentalData, roadSurfaceData] = initEnvironmentAndSurface(numSeg
                              'moisture', zeros(numSegments, 1), ...
                              'icing', zeros(numSegments, 1), ...
                              'salinity', zeros(numSegments, 1));
+    
+    thresholds.env.temp.min         = -20; % km/h
+    thresholds.env.temp.max         = 50;
+    thresholds.env.temp.moderate    = thresholds.env.temp.max;
+    thresholds.env.temp.heavy       = thresholds.env.temp.max;
+    thresholds.env.temp.extreme     = thresholds.env.temp.max;
+    thresholds.env.temp.likeliness  = 15;
 
-    baseTemperature = randi([-20, 50]); % Temperature in Celsius;
-    baseWindSpeed = randi([0, 110]); % Wind speed in km/h
-    basePrecipitation = max(0, min(50, abs(randn)*5 + 2.5)); % Precipitation in mm/h
+    thresholds.env.wind.min           = 0;
+    thresholds.env.wind.max           = 110;
+    thresholds.env.wind.moderate      = 48;
+    thresholds.env.wind.heavy         = 72;
+    thresholds.env.wind.extreme       = 86.4;
+    thresholds.env.wind.likeliness    = 14; % [5-25] km/h
+
+    thresholds.env.humid.min        = 0;
+    thresholds.env.humid.max        = 100;
+    thresholds.env.humid.moderate   = 0;
+    thresholds.env.humid.heavy      = 0;
+    thresholds.env.humid.extreme    = 0;
+    thresholds.env.humid.likeliness = 0;
+
+    thresholds.env.precip.min        = 0; % mm/h
+    thresholds.env.precip.max        = 50;
+    thresholds.env.precip.moderate   = 2.5; % reduce speed by 10-17%
+    thresholds.env.precip.heavy      = 7.6; % reduce speed by 19-27%
+    thresholds.env.precip.extreme    = 50; % reduce speed at 5 km/h
+    thresholds.env.precip.likeliness = 1; 
+
+    thresholds.env.visib.min = 5000; % meters
+    thresholds.env.visib.max = 0;
+    thresholds.env.visib.moderate   = 1000; % 200-1000 meters: Reduce the speed by 1/3
+    thresholds.env.visib.heavy      = 200; % 50-200 m: limit the speed at 50 km/h
+    thresholds.env.visib.extreme    = 50; % <50 m: stop the vehicle or maybe 5 km/h
+    thresholds.env.visib.likeliness = 700;
+
+    baseTemperature = randi([thresholds.env.temp.min, thresholds.env.temp.max]); % Temperature in Celsius;
+    baseWindSpeed = randi([thresholds.env.wind.min, thresholds.env.wind.max]); % Wind speed in km/h
+    basePrecipitation = max(thresholds.env.precip.min, min(thresholds.env.precip.max, abs(randn)*5 + 2.5)); % Precipitation in mm/h
     baseHumidity = deriveHumidity(baseTemperature, basePrecipitation);
-    baseVisibility = deriveVisibility(baseWindSpeed, basePrecipitation);
+    baseVisibility = deriveVisibility(thresholds.env, baseWindSpeed, basePrecipitation);
 
     baseSurfaceTemperature = adjustSurfaceTemp(baseTemperature, -20, 55);
     baseMoisture = adjustMoisture(basePrecipitation, baseSurfaceTemperature);
@@ -71,9 +105,24 @@ function humidity = deriveHumidity(temperature, precipitation)
     humidity = min(100, max(0, 60 + precipitation - temperature / 2));
 end
 
-function visibility = deriveVisibility(windSpeed, precipitation)
-    % Example logic: Higher wind speed or precipitation reduces visibility
-    visibility = max(0.2, 10 - precipitation / 2 - windSpeed / 10);
+function visibility = deriveVisibility(environmentalDataThresholds, windSpeed, precipitation)
+    % Define the wind and precipitation coefficients
+    windCoef = 0.5;
+    precipCoef = 0.5;
+    
+    % Compute the reduction factors
+    windEffect = min(exp(windCoef * environmentalDataThresholds.wind.heavy), exp(windCoef * windSpeed));
+    precipEffect = min(exp(precipCoef * environmentalDataThresholds.precip.heavy), exp(precipCoef * precipitation));
+    
+    % Map the wind and precipitation effects into [0-2] range
+    windEffectMapped = (windEffect / environmentalDataThresholds.wind.heavy) * 2;
+    precipEffectMapped = (precipEffect / environmentalDataThresholds.precip.heavy) * 2;
+    
+    % Compute the visibility adjustment
+    visibilityAdjustment = environmentalDataThresholds.visib.likeliness * (windEffectMapped - precipEffectMapped);
+    
+    % Ensure the visibility adjustment is within the specified range
+    visibility = max(0, min(2000, visibilityAdjustment));
 end
 
 function surfaceTemp = adjustSurfaceTemp(temperature, minSurfaceTemp, maxSurfaceTemp)
@@ -112,13 +161,11 @@ function salinity = adjustSalinity(precipitation, maxSalinity)
 end
 
 %% Generate Traffic Flow mock data for each segment
-function trafficData = initTrafficFlow(numSegments, numLanes, speedBounds, precipitation, icing)
+function trafficData = initTrafficFlow(numSegments, numLanes, thresholds, precipitation, icing)
     trafficData = struct('speed', zeros(numSegments, numLanes), ...
                          'flow', zeros(numSegments, numLanes), ...
                          'density', zeros(numSegments, numLanes));
     for i = 1:numSegments
-        ix = uint32(i);
-
         % The variables of flow, density, and space mean speed are related
         % definitionally as flow = density x space mean speed
     
@@ -127,27 +174,28 @@ function trafficData = initTrafficFlow(numSegments, numLanes, speedBounds, preci
         baseDensity = getDensity(maxDensity);
 
         % Speed Calculation considering different traffic conditions
-        baseSpeed = getSpeedBasedOnDensity(maxDensity, baseDensity, speedBounds, ix, precipitation, icing);
+        baseSpeed = getSpeedBasedOnDensity(maxDensity, baseDensity, thresholds.speed, i, precipitation, icing);
 
         % Flow Calculation with variability
         % maxFlow = 40; % Not required
         baseFlow = baseDensity * baseSpeed * (1 + randn() * 0.1); % Add 10% variability
 
         % Traffic jam thresholds
-        if baseFlow > 2600 || baseDensity >= 40 || baseSpeed < 50
+        if baseFlow > thresholds.flow.max || baseDensity >= 40 || baseSpeed < 50
             trafficJam = 1;
         else
             trafficJam = 0;
         end
 
         for j = 1:numLanes
-            jx = uint32(j);
             % Adjust values for each lane, ensuring lane 1 < lane 2 < lane 3
             % laneDifferenceFlow = 2 + 3 * rand; % x to y vehicles/h/lane difference
             laneDifferenceDensity = (0.01 + 7) * rand; % x to y difference vehicles/km/lane
             laneDifferenceSpeed = (2/laneDifferenceDensity)^2; % x to y km/h difference
-                        
-            trafficData.speed(i, j) = adjustWithinRange(baseSpeed + (j-1) * laneDifferenceSpeed, 5, 0, speedBounds.maxSpeed(ix,jx));
+            
+            trafficData.optimalSpeed(i, j) = 95 - j*5; % FIXME: fabriccated values
+
+            trafficData.speed(i, j) = adjustWithinRange(baseSpeed + (j-1) * laneDifferenceSpeed, 5, 0, thresholds.speed.max(i,j));
             trafficData.density(i, j) = adjustWithinRange(baseDensity + (j-1) * laneDifferenceDensity, 5, 0, maxDensity);
             trafficData.flow(i, j) = trafficData.speed(i, j) * trafficData.density(i, j);
         end
@@ -167,7 +215,7 @@ end
 function baseSpeed = getSpeedBasedOnDensity(maxDensity, baseDensity, speedBounds, segment, precipitation, icing) 
     jamDensity = maxDensity; % Density at which traffic is jammed
     % Calculate speed using Greenshields' linear model
-    baseSpeed = speedBounds.maxSpeed(segment, 1) * (1 - baseDensity / jamDensity);
+    baseSpeed = speedBounds.max(segment, 1) * (1 - baseDensity / jamDensity);
     
     % Introduce variability in speed
     % speedVariability = randn() * 5; % Adding variability with a standard deviation of 5 km/h
@@ -177,7 +225,7 @@ function baseSpeed = getSpeedBasedOnDensity(maxDensity, baseDensity, speedBounds
     baseSpeed = adjustSpeedForConditions(baseSpeed, precipitation, icing);
     
     % Ensure the speed is not negative or exceeding maxSpeed
-    baseSpeed = max(min(baseSpeed, speedBounds.maxSpeed(segment, 1)), 0);
+    baseSpeed = max(min(baseSpeed, speedBounds.max(segment, 1)), 0);
 end
 
 function adjustedSpeed = adjustSpeedForConditions(baseSpeed, precipitation, icing)
@@ -204,13 +252,3 @@ function adjustedSpeed = adjustSpeedForConditions(baseSpeed, precipitation, icin
     adjustedSpeed = max(baseSpeed, minSpeedLimit);
 end
 
-
-% Obsolete: adjusting the logistic model parameters doesn't yield satisfactory results
-function baseSpeed = getSpeedBasedOnDensity_old(maxDensity, baseDensity, speedBounds) 
-    k = -0.05; % The Sensitivity Factor determines how quickly speed decreases as density approaches the critical value.
-    criticalDensity = 0.75 * maxDensity; % The density at which traffic conditions start to significantly affect speed
-    % The logistic function is often used in traffic flow models to represent the transition from free flow to congested conditions as density increases
-    speedReductionFactor = @(d) 1./(1 + exp(k*(d - criticalDensity)));
-    baseSpeed = speedBounds.maxSpeed(ix,1) * speedReductionFactor(baseDensity);
-    baseSpeed = baseSpeed + randn() * 2; % Adds Gaussian noise to the base speed. This step introduces variability, simulating real-world unpredictability in speeds.
-end

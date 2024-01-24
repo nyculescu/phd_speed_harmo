@@ -3,16 +3,16 @@ function mainTrafficOptimization()
     addpath './input_data'
 
     [numSegments, numLanes] = deal(4, 3); % Example values % FIXME: for now, only 4 segments by 3 lanes are generated
-    segmentLength = 10;  % km, as per the requirement
+    segmentLength = 20;  % km, as per the requirement
 
-    localData = struct(); % Data stored and/or data predicted by ML-based sub-system
+    % localData = struct(); % Data stored and/or data predicted by ML-based sub-system
     % The local data is used to fusion (or augment) with or replace the sensor data
-    [densityRange_local, speedRange_local] = initLocalData(numSegments, numLanes, localData);
+    % [densityRange_local, speedRange_local] = initLocalData(numSegments, numLanes, localData);
 
     mainLoopCycleUpdateInterval = 3; % how often to update the data [seconds]
     mainLoopCycle = 0; % Initialize
 
-    [trafficData, environmentalData, roadSurfaceData, speedBounds] = initTrafficData_Mock(numSegments, numLanes);
+    [trafficData, environmentalData, roadSurfaceData, thresholds] = initInputDataWithSynthVal(numSegments, numLanes);
 
     %% The main loop code
     while true
@@ -21,18 +21,19 @@ function mainTrafficOptimization()
         % 2. Environmental conditions
         % 3. Road surface conditions
         % 4. Location and motion information of the vehicles passing the lane. FIXME: not needed at this moment
-        RsuData = getTrafficData_Mock(numSegments, numLanes, ...
-            trafficData, environmentalData, roadSurfaceData, speedBounds);
+        RsuData = getInputDataWithSynthVal(numSegments, numLanes, ...
+            trafficData, environmentalData, roadSurfaceData, thresholds.speed);
+
         displayTrafficData(RsuData, mainLoopCycle);
         % Check the System health: operational status of the sensors and the system as a whole, 
         % including fault data and cybersecurity threats
         runSystemConditionObserver(numSegments, numLanes, RsuData, 10, 10);
 
         % Call the optimization routine
-        v_lim_opt = getOptimalSpeedLimits(mainLoopCycle, numSegments, numLanes, RsuData, speedBounds, segmentLength);
+        optimalSpeedLimits = getOptimalSpeedLimits(mainLoopCycle, numSegments, numLanes, RsuData, thresholds, segmentLength);
         
         % Plot the optimized speed limits for each lane
-        displayGridRhoValue(v_lim_opt, numSegments, numLanes, mainLoopCycle);
+        displayGridOptimalSpeedLimits(optimalSpeedLimits, numSegments, numLanes, mainLoopCycle);
         
         % Wait for the next update
         mainLoopCycle = mainLoopCycle + 1;
@@ -40,7 +41,7 @@ function mainTrafficOptimization()
     end
 end
 
-function displayGridRhoValue(v_lim_opt, numSegments, numLanes, mainLoopCycle)
+function displayGridOptimalSpeedLimits(v_lim_opt, numSegments, numLanes, mainLoopCycle)
 % Display the optimized speed limits
     disp_out = ['Optimal speed limit at iteration ', num2str(mainLoopCycle)];
     disp(disp_out);
