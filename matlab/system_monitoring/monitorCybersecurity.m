@@ -6,11 +6,11 @@ function [isSystemSecure, securityReport] = monitorCybersecurity(data)
     securityReport = struct();
 
     % Simulate cybersecurity threat
-    if rand < 0.05 % 5% chance of threat
-        isSystemSecure = false;
-        securityReport.issue = 'Potential Cybersecurity Threat';
-        securityReport.details = 'Unusual data pattern detected';
-    end
+    % if rand < 0.05 % 5% chance of threat
+    %     isSystemSecure = false;
+    %     securityReport.issue = 'Potential Cybersecurity Threat';
+    %     securityReport.details = 'Unusual data pattern detected';
+    % end
     
     % TODO: ML could be used further to detect and/or predict cybersecurity threats
 end

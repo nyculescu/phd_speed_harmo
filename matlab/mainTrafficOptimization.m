@@ -1,6 +1,7 @@
 function mainTrafficOptimization()
     addpath './system_monitoring'
     addpath './input_data'
+    addpath './fault_injection'
 
     [numSegments, numLanes] = deal(4, 3); % Example values % FIXME: for now, only 4 segments by 3 lanes are generated
     segmentLength = 20;  % km, as per the requirement
@@ -13,9 +14,15 @@ function mainTrafficOptimization()
     mainLoopCycle = 0; % Initialize
 
     [trafficData, environmentalData, roadSurfaceData, thresholds] = initInputDataWithSynthVal(numSegments, numLanes);
+    
+    % Shared variable
+    faultInj = [NaN, NaN];
+    launchFaultInjectionUI(faultInj);
 
     %% The main loop code
     while true
+        faultInjectionManager();
+
         % Retreieve real-time measured conditions: % FIXME: At this moment, they are mocked 
         % 1. Traffic conditions
         % 2. Environmental conditions
@@ -39,13 +46,15 @@ function mainTrafficOptimization()
         mainLoopCycle = mainLoopCycle + 1;
         pause(mainLoopCycleUpdateInterval);
     end
+
+
 end
 
 function displayGridOptimalSpeedLimits(v_lim_opt, numSegments, numLanes, mainLoopCycle)
 % Display the optimized speed limits
-    disp_out = ['Optimal speed limit at iteration ', num2str(mainLoopCycle)];
-    disp(disp_out);
-    disp(v_lim_opt);
+    % disp_out = ['Optimal speed limit at iteration ', num2str(mainLoopCycle)];
+    % disp(disp_out);
+    % disp(v_lim_opt);
 
     % Plot the optimized speed limits for each lane
     % Create or refresh the figure
@@ -59,12 +68,15 @@ function displayGridOptimalSpeedLimits(v_lim_opt, numSegments, numLanes, mainLoo
             subplot(numSegments, numLanes, (segment - 1) * numLanes + lane);
             plot(x, ones(size(x)) * v_lim_opt(segment, lane), 'b-', 'LineWidth', 2);
             xlabel('Position on Road [km]');
-            ylabel('Rec Spd [km/h]'); % Recommended Speed
+            ylabel('Speed Rec. [km/h]'); % Recommended Speed
             ylim([0, 130]); % Set the y-axis limits
             grid on;
 
             % Add a subtitle
-            title(['Segment ', num2str(segment), ', Lane ', num2str(lane)]);
+            title(['Seg. ', num2str(segment), ', Lane ', num2str(lane)]);
+
+            speedLimit = v_lim_opt(segment, lane);
+            text(3, 20, [num2str(speedLimit), ' km/h'], 'HorizontalAlignment', 'left'); 
         end
     end
     % Set a common title for all subplots
@@ -90,3 +102,5 @@ function displayTrafficData(RsuData, mainLoopCycle)
     disp('Road Surface Data Table:');
     disp(roadSurfaceDataTable);
 end
+
+

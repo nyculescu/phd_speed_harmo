@@ -7,11 +7,11 @@ function [isDataValid, anomalyReport] = checkDataIntegrity(sensorData)
     % Implement checks for data anomalies on sensorData variable
     % FIXME: at this moment, only simulation is available
     % Simulate random anomalies for demonstration
-    if rand < 0.1 % 10% chance of anomaly
-        isDataValid = false;
-        anomalyReport.issue = 'Data Anomaly Detected';
-        anomalyReport.details = 'Unexpected data fluctuation';
-    end
+    % if rand < 0.1 % 10% chance of anomaly
+    %     isDataValid = false;
+    %     anomalyReport.issue = 'Data Anomaly Detected';
+    %     anomalyReport.details = 'Unexpected data fluctuation';
+    % end
 
     % TODO: ML could be used further to detect or/and predict input data
     % anomalies

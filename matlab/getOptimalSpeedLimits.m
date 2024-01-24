@@ -4,7 +4,7 @@ function [optimalSpeedLimits] = getOptimalSpeedLimits(mainLoopCycle, ...
     % to minimize traffic flow, considering various constraints.
 
     % Define Optimization Problem
-    opts = optimoptions('fmincon', 'Algorithm', 'sqp');
+    opts = optimoptions('fmincon', 'Algorithm', 'sqp', 'Display', 'off'); % 'Display', 'off' used to supress the logs of the fmincon
 
     % The objective function - Calculate the whole flow over Segments x Lanes
     objectiveFunction = @(x) -sum(sum(RsuData.traffic.speed .* RsuData.traffic.density));
